@@ -1,0 +1,7 @@
+# Page 1 lines kept: title and cover date (names and contact lines removed)
+EARNINGS INSIGHT
+October 16, 2026
+# Lines containing the two sentences, as pdfplumber extracted them
+• Valuation: The forward 12-month P/E ratio for the S&P 500 is 19.0. This P/E ratio is below the 5-year average
+The forward 12-month P/E ratio for the S&P 500 is 19.0. This P/E ratio is below the 5-year average of 19.8 and below the
+The bottom-up target price for the S&P 500 is 9,317.90, which is 20.3% above the closing price of 7,744.06. At the sector

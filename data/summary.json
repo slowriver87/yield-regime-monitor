@@ -1,0 +1,48 @@
+{
+  "updated": "2026-10-19",
+  "yields_date": "2026-10-16",
+  "y2": 4.74,
+  "y10": 5.09,
+  "y30": 5.43,
+  "curve": 0.35,
+  "real": 2.74,
+  "be": 2.35,
+  "split_date": "2026-10-16",
+  "hy": 3.31,
+  "hy_date": "2026-10-16",
+  "gap": 0.17,
+  "fed": {
+    "lo": 3.75,
+    "hi": 4.0,
+    "date": "2026-10-15"
+  },
+  "mort": 7.4,
+  "mort_date": "2026-10-15",
+  "tiles": [
+    {
+      "name": "What's driving the 10Y?",
+      "status": "good",
+      "label": "Easing"
+    },
+    {
+      "name": "Curve shape (10Y − 2Y)",
+      "status": "good",
+      "label": "Not inverted"
+    },
+    {
+      "name": "High-yield credit spread",
+      "status": "warn",
+      "label": "Watch"
+    },
+    {
+      "name": "Auction demand",
+      "status": "good",
+      "label": "Solid"
+    },
+    {
+      "name": "Equity yield gap",
+      "status": "crit",
+      "label": "No cushion"
+    }
+  ]
+}

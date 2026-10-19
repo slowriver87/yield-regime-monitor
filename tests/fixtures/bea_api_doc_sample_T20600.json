@@ -1,0 +1,116 @@
+{
+ "BEAAPI": {
+  "Request": {
+   "RequestParam": [
+    {
+     "ParameterName": "TABLENAME",
+     "ParameterValue": "T20600"
+    }
+   ]
+  },
+  "Results": {
+   "Statistic": "NIPA Table",
+   "UTCProductionTime": "2026-09-30T12:30:00.000",
+   "Dimensions": [],
+   "Data": [
+    {
+     "TableName": "T20600",
+     "SeriesCode": "S034",
+     "LineNumber": "34",
+     "LineDescription": "Personal saving",
+     "TimePeriod": "2026M05",
+     "METRIC_NAME": "Current Dollars",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "1,000.5",
+     "NoteRef": "T20600"
+    },
+    {
+     "TableName": "T20600",
+     "SeriesCode": "S034",
+     "LineNumber": "34",
+     "LineDescription": "Personal saving",
+     "TimePeriod": "2026M06",
+     "METRIC_NAME": "Current Dollars",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "1,010.2",
+     "NoteRef": "T20600"
+    },
+    {
+     "TableName": "T20600",
+     "SeriesCode": "S034",
+     "LineNumber": "34",
+     "LineDescription": "Personal saving",
+     "TimePeriod": "2026M07",
+     "METRIC_NAME": "Current Dollars",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "1,100.0",
+     "NoteRef": "T20600"
+    },
+    {
+     "TableName": "T20600",
+     "SeriesCode": "S034",
+     "LineNumber": "34",
+     "LineDescription": "Personal saving",
+     "TimePeriod": "2026M8",
+     "METRIC_NAME": "Current Dollars",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "990.0",
+     "NoteRef": "T20600"
+    },
+    {
+     "TableName": "T20600",
+     "SeriesCode": "S035",
+     "LineNumber": "35",
+     "LineDescription": "Personal saving as a percentage of disposable personal income",
+     "TimePeriod": "2026M05",
+     "METRIC_NAME": "Current Dollars",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "4.5",
+     "NoteRef": "T20600"
+    },
+    {
+     "TableName": "T20600",
+     "SeriesCode": "S035",
+     "LineNumber": "35",
+     "LineDescription": "Personal saving as a percentage of disposable personal income",
+     "TimePeriod": "2026M06",
+     "METRIC_NAME": "Current Dollars",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "4.5",
+     "NoteRef": "T20600"
+    },
+    {
+     "TableName": "T20600",
+     "SeriesCode": "S035",
+     "LineNumber": "35",
+     "LineDescription": "Personal saving as a percentage of disposable personal income",
+     "TimePeriod": "2026M07",
+     "METRIC_NAME": "Current Dollars",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "4.6",
+     "NoteRef": "T20600"
+    },
+    {
+     "TableName": "T20600",
+     "SeriesCode": "S035",
+     "LineNumber": "35",
+     "LineDescription": "Personal saving as a percentage of disposable personal income",
+     "TimePeriod": "2026M8",
+     "METRIC_NAME": "Current Dollars",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "4.1",
+     "NoteRef": "T20600"
+    }
+   ],
+   "Notes": []
+  }
+ }
+}

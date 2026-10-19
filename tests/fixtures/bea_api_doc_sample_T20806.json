@@ -1,0 +1,116 @@
+{
+ "BEAAPI": {
+  "Request": {
+   "RequestParam": [
+    {
+     "ParameterName": "TABLENAME",
+     "ParameterValue": "T20806"
+    }
+   ]
+  },
+  "Results": {
+   "Statistic": "NIPA Table",
+   "UTCProductionTime": "2026-09-30T12:30:00.000",
+   "Dimensions": [],
+   "Data": [
+    {
+     "TableName": "T20806",
+     "SeriesCode": "S001",
+     "LineNumber": "1",
+     "LineDescription": "Personal consumption expenditures (PCE)",
+     "TimePeriod": "2026M05",
+     "METRIC_NAME": "Current Dollars",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "17,000.0",
+     "NoteRef": "T20806"
+    },
+    {
+     "TableName": "T20806",
+     "SeriesCode": "S001",
+     "LineNumber": "1",
+     "LineDescription": "Personal consumption expenditures (PCE)",
+     "TimePeriod": "2026M06",
+     "METRIC_NAME": "Current Dollars",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "17,034.0",
+     "NoteRef": "T20806"
+    },
+    {
+     "TableName": "T20806",
+     "SeriesCode": "S001",
+     "LineNumber": "1",
+     "LineDescription": "Personal consumption expenditures (PCE)",
+     "TimePeriod": "2026M07",
+     "METRIC_NAME": "Current Dollars",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "17,051.0",
+     "NoteRef": "T20806"
+    },
+    {
+     "TableName": "T20806",
+     "SeriesCode": "S001",
+     "LineNumber": "1",
+     "LineDescription": "Personal consumption expenditures (PCE)",
+     "TimePeriod": "2026M8",
+     "METRIC_NAME": "Current Dollars",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "17,153.3",
+     "NoteRef": "T20806"
+    },
+    {
+     "TableName": "T20806",
+     "SeriesCode": "S002",
+     "LineNumber": "2",
+     "LineDescription": "Goods",
+     "TimePeriod": "2026M05",
+     "METRIC_NAME": "Current Dollars",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "5,800",
+     "NoteRef": "T20806"
+    },
+    {
+     "TableName": "T20806",
+     "SeriesCode": "S002",
+     "LineNumber": "2",
+     "LineDescription": "Goods",
+     "TimePeriod": "2026M06",
+     "METRIC_NAME": "Current Dollars",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "5,810",
+     "NoteRef": "T20806"
+    },
+    {
+     "TableName": "T20806",
+     "SeriesCode": "S002",
+     "LineNumber": "2",
+     "LineDescription": "Goods",
+     "TimePeriod": "2026M07",
+     "METRIC_NAME": "Current Dollars",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "5,820",
+     "NoteRef": "T20806"
+    },
+    {
+     "TableName": "T20806",
+     "SeriesCode": "S002",
+     "LineNumber": "2",
+     "LineDescription": "Goods",
+     "TimePeriod": "2026M8",
+     "METRIC_NAME": "Current Dollars",
+     "CL_UNIT": "Level",
+     "UNIT_MULT": "0",
+     "DataValue": "5,830",
+     "NoteRef": "T20806"
+    }
+   ],
+   "Notes": []
+  }
+ }
+}
