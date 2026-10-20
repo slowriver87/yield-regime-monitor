@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<message:MessageGroup xmlns:message="http://www.SDMX.org/resources/SDMXML/schemas/v1_0/message" xmlns:common="http://www.SDMX.org/resources/SDMXML/schemas/v1_0/common" xmlns:frb="http://www.federalreserve.gov/structure/compact/common">
+  <frb:DataSet id="H15">
+    <kf:Series CURRENCY="NA" FREQ="9" INSTRUMENT="TCMII" MATURITY="Y10" SERIES_NAME="RIFLGFCY10_XII_N.B" UNIT="Percent:_Per_Year" UNIT_MULT="1">
+      <frb:Annotations>
+        <common:Annotation>
+          <common:AnnotationType>Short Description</common:AnnotationType>
+          <common:AnnotationText>10-year inflation indexed Treasury constant maturity</common:AnnotationText>
+        </common:Annotation>
+        <common:Annotation>
+          <common:AnnotationType>Long Description</common:AnnotationType>
+          <common:AnnotationText>Market yield on U.S. Treasury securities at 10-year  constant maturity, quoted on investment basis,  inflation-indexed</common:AnnotationText>
+        </common:Annotation>
+      </frb:Annotations>
+      <frb:Obs OBS_STATUS="A" OBS_VALUE="2.60" TIME_PERIOD="2026-09-14" />
+      <frb:Obs OBS_STATUS="A" OBS_VALUE="2.62" TIME_PERIOD="2026-09-15" />
+      <frb:Obs OBS_STATUS="A" OBS_VALUE="2.68" TIME_PERIOD="2026-09-16" />
+      <frb:Obs OBS_STATUS="A" OBS_VALUE="2.61" TIME_PERIOD="2026-09-17" />
+      <frb:Obs OBS_STATUS="A" OBS_VALUE="2.68" TIME_PERIOD="2026-09-18" />
+      <frb:Obs OBS_STATUS="A" OBS_VALUE="2.62" TIME_PERIOD="2026-09-21" />
+      <frb:Obs OBS_STATUS="A" OBS_VALUE="2.63" TIME_PERIOD="2026-09-22" />
+      <frb:Obs OBS_STATUS="A" OBS_VALUE="2.76" TIME_PERIOD="2026-09-23" />
+      <frb:Obs OBS_STATUS="A" OBS_VALUE="2.85" TIME_PERIOD="2026-09-24" />
+      <frb:Obs OBS_STATUS="A" OBS_VALUE="2.83" TIME_PERIOD="2026-09-25" />
+      <frb:Obs OBS_STATUS="A" OBS_VALUE="2.90" TIME_PERIOD="2026-09-28" />
+      <frb:Obs OBS_STATUS="A" OBS_VALUE="2.91" TIME_PERIOD="2026-09-29" />
+      <frb:Obs OBS_STATUS="A" OBS_VALUE="2.93" TIME_PERIOD="2026-09-30" />
+      <frb:Obs OBS_STATUS="A" OBS_VALUE="2.88" TIME_PERIOD="2026-10-01" />
+      <frb:Obs OBS_STATUS="A" OBS_VALUE="2.92" TIME_PERIOD="2026-10-02" />
+      <frb:Obs OBS_STATUS="A" OBS_VALUE="2.95" TIME_PERIOD="2026-10-05" />
+      <frb:Obs OBS_STATUS="A" OBS_VALUE="2.91" TIME_PERIOD="2026-10-06" />
+      <frb:Obs OBS_STATUS="A" OBS_VALUE="2.92" TIME_PERIOD="2026-10-07" />
+      <frb:Obs OBS_STATUS="A" OBS_VALUE="2.87" TIME_PERIOD="2026-10-08" />
+      <frb:Obs OBS_STATUS="A" OBS_VALUE="2.91" TIME_PERIOD="2026-10-09" />
+      <frb:Obs OBS_STATUS="ND" OBS_VALUE="-9999" TIME_PERIOD="2026-10-12" />
+      <frb:Obs OBS_STATUS="A" OBS_VALUE="2.88" TIME_PERIOD="2026-10-13" />
+      <frb:Obs OBS_STATUS="A" OBS_VALUE="2.84" TIME_PERIOD="2026-10-14" />
+      <frb:Obs OBS_STATUS="A" OBS_VALUE="2.78" TIME_PERIOD="2026-10-15" />
+      <frb:Obs OBS_STATUS="A" OBS_VALUE="2.74" TIME_PERIOD="2026-10-16" />
+    </kf:Series>
+  </frb:DataSet>
+</message:MessageGroup>
