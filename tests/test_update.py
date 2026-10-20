@@ -449,3 +449,26 @@ def test_failed_reread_of_same_date_keeps_page_value(tmp_path, offline, src, pat
     assert rc == 0 and kept(b) == kept(blocks())
     row = next(r for r in b["LOG"] if r[0] == label)
     assert row[5].startswith("Kept page value: re-read of")
+
+
+def test_tests_never_write_the_job_summary():
+    """The job summary of runs #2 and #3 showed the test suite's fixture reports, not the real run."""
+    import os
+    assert "GITHUB_STEP_SUMMARY" not in os.environ and "GITHUB_OUTPUT" not in os.environ
+
+
+def test_run_writes_one_report_to_the_job_summary(tmp_path, offline, monkeypatch):
+    summary, outputs = tmp_path / "summary.md", tmp_path / "outputs.txt"
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+    monkeypatch.setenv("GITHUB_OUTPUT", str(outputs))
+    rc, _ = run(tmp_path, dry_run=True, keys={"CONTACT_EMAIL": "contact-token-for-test"})
+    s = summary.read_text(encoding="utf-8")
+    assert rc == 0 and s.count("## Yield Regime Monitor update") == 1
+    assert "- Contact User-Agent for BLS and DOL: set." in s and "contact-token-for-test" not in s
+    assert "changed=false" in outputs.read_text(encoding="utf-8")
+
+
+def test_contact_not_set_message(tmp_path, offline, capsys):
+    run(tmp_path, dry_run=True, keys={})
+    assert ("- Contact User-Agent for BLS and DOL: not set (CONTACT_EMAIL empty; the workflow fills it "
+            "from the COMMIT_EMAIL variable).") in capsys.readouterr().out

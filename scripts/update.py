@@ -1231,7 +1231,8 @@ def run_update(page: Path, summary_path: Path, dry_run: bool, commit_msg: Path |
                                           "CONTACT_EMAIL")}
     if keys.get("CONTACT_EMAIL") and os.environ.get("GITHUB_ACTIONS") == "true":
         print(f"::add-mask::{keys['CONTACT_EMAIL']}")  # masks any later appearance in the job log
-    say(f"- Contact User-Agent for BLS and DOL: {'set' if keys.get('CONTACT_EMAIL') else 'not set (COMMIT_EMAIL empty)'}.")
+    say("- Contact User-Agent for BLS and DOL: " + ("set." if keys.get("CONTACT_EMAIL") else
+        "not set (CONTACT_EMAIL empty; the workflow fills it from the COMMIT_EMAIL variable)."))
     run = None
     try:
         html = page.read_text(encoding="utf-8")

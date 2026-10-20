@@ -51,6 +51,15 @@ def auction_records():
     return json.loads(text("td_auctioned_note.json")) + json.loads(text("td_auctioned_bond.json"))
 
 
+@pytest.fixture(autouse=True)
+def no_github_step_files(monkeypatch):
+    """GitHub sets GITHUB_STEP_SUMMARY and GITHUB_OUTPUT for every step, the test step included.
+    Without this, each test run of update.run_update appended its fixture report (no contact, all
+    checks passed) to the job summary above the real run's report."""
+    for k in ("GITHUB_STEP_SUMMARY", "GITHUB_OUTPUT", "GITHUB_ACTIONS"):
+        monkeypatch.delenv(k, raising=False)
+
+
 @pytest.fixture
 def offline(monkeypatch):
     """Patch every getter to its fixture. Returns a dict a test can edit to change one source."""
