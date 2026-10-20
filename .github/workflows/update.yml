@@ -58,6 +58,8 @@ jobs:
           CENSUS_API_KEY: ${{ secrets.CENSUS_API_KEY }}
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
           EIA_API_KEY: ${{ secrets.EIA_API_KEY }}
+          # Contact for the BLS and DOL User-Agent only; the script never prints it and masks it in the log
+          CONTACT_EMAIL: ${{ vars.COMMIT_EMAIL }}
         run: |
           args=(--commit-msg "$RUNNER_TEMP/commit-msg.txt" --issue-body "$RUNNER_TEMP/issue-body.md")
           if [ "$DRY_RUN" = "true" ]; then args+=(--dry-run); fi

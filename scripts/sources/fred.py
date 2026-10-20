@@ -9,7 +9,7 @@ import csv
 import io
 import json
 
-from .common import FRED_TIMEOUT, SourceError, fetch_once, num
+from .common import FRED_TIMEOUT, SourceError, fetch_once, is_business_day, num, parse_iso
 
 SERIES = "BAMLH0A0HYM2"
 URL_API = ("https://api.stlouisfed.org/fred/series/observations?series_id={s}&api_key={k}"
@@ -41,6 +41,36 @@ def parse_csv(text: str) -> dict[str, float]:
     if not out:
         raise SourceError("fredgraph.csv: no observations")
     return out
+
+
+def trading_days_only(obs: dict[str, float], trading: set[str] | None) -> dict[str, float]:
+    """Keep the dates that are in the Treasury par yield file, so bond-market holidays (e.g. Oct 12,
+    Columbus Day) drop out. A date after the newest par date is kept when it is a business day,
+    since the day's par yields post later than FRED."""
+    if not trading:
+        return {d: v for d, v in obs.items() if is_business_day(parse_iso(d))}
+    last = max(trading)
+    return {d: v for d, v in obs.items() if d in trading or (d > last and is_business_day(parse_iso(d)))}
+
+
+def get_api_series(series: str, api_key: str | None, limit: int = 10) -> dict[str, float]:
+    """One FRED API call (15-second timeout), newest first."""
+    if not api_key:
+        raise SourceError("FRED API: no FRED_API_KEY")
+    url = URL_API.format(s=series, k=api_key).replace("limit=10", f"limit={limit}")
+    return parse_api(fetch_once(url, FRED_TIMEOUT, label=f"FRED API {series}").decode("utf-8"))
+
+
+def icsa(obs: dict[str, float]) -> dict:
+    """Initial claims from FRED ICSA (week-ending Saturday, seasonally adjusted). FRED's unit is
+    'Number', so values are divided by 1,000 to match the page's thousands."""
+    weeks = sorted(obs)
+    if len(weeks) < 2:
+        raise SourceError("FRED ICSA: fewer than two weeks")
+    k = {w: round(obs[w] / 1000) for w in weeks[-2:]}
+    if not all(50 <= v <= 2000 for v in k.values()):
+        raise SourceError(f"FRED ICSA: values outside 50-2,000 thousand: {k}")
+    return {"week": weeks[-1], "latest": k[weeks[-1]], "pweek": weeks[-2], "prior": k[weeks[-2]]}
 
 
 def get(api_key: str | None) -> tuple[dict[str, float], str]:

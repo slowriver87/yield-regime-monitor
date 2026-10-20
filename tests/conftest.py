@@ -71,6 +71,7 @@ def offline(monkeypatch):
         "bls": lambda: bls.compute(bls.parse_api(text("bls_api_v2_doc_sample.json"))),
         "bls_cal": lambda: bls.parse_ics((FIX / "bls_ics_doc_sample.ics").read_text(encoding="utf-8")),
         "dol": lambda: dol.parse_text(text("dol_claims_doc_sample.txt")),
+        "fred_icsa": lambda: fred.parse_api(text("fred_icsa_doc_sample.json")),
         "bea": bea_tables,
         "bea_dates": lambda: bea.parse_dates(text("bea_release_dates.json")),
         "gdpnow_xlsx": lambda: gdpnow.parse_rows(gdpnow_rows()),
@@ -98,9 +99,10 @@ def offline(monkeypatch):
     monkeypatch.setattr(auctions, "get_latest", lambda: call("auction"))
     monkeypatch.setattr(auctions, "get_upcoming", lambda: call("upcoming"))
     monkeypatch.setattr(factset, "get", lambda today: call("factset"))
-    monkeypatch.setattr(bls, "get", lambda key, today: call("bls"))
-    monkeypatch.setattr(bls, "get_calendar", lambda: call("bls_cal"))
-    monkeypatch.setattr(dol, "get", lambda: call("dol"))
+    monkeypatch.setattr(bls, "get", lambda key, today, contact=None: call("bls"))
+    monkeypatch.setattr(bls, "get_calendar", lambda contact=None: call("bls_cal"))
+    monkeypatch.setattr(dol, "get", lambda contact=None: call("dol"))
+    monkeypatch.setattr(fred, "get_api_series", lambda series, key, limit=10: call("fred_" + series.lower()))
     monkeypatch.setattr(bea, "get_tables", lambda key, today: call("bea"))
     monkeypatch.setattr(bea, "get_dates", lambda: call("bea_dates"))
     monkeypatch.setattr(gdpnow, "get_xlsx", lambda: call("gdpnow_xlsx"))

@@ -300,3 +300,119 @@ def test_no_personal_information_in_repo():
         t = p.read_text(encoding="utf-8", errors="ignore")
         assert not email.search(t), p
         assert not re.search(r"claude\.ai/", t), p
+
+
+# --- Census duplicates, the "added" display, contact User-Agent, claims fallback, HY trading days ----
+
+def test_census_duplicate_in_unused_series_is_ignored(offline):
+    from conftest import text as fx
+    from sources import census
+    rows = json.loads(fx("census_eits_doc_sample_resconst.json"))
+    h = rows[0]
+    rows += [["600", "SINGLE", "0", "no", "ACOMPLETIONS", "yes", "2025-06"],
+             ["612", "SINGLE", "1", "no", "ACOMPLETIONS", "yes", "2025-06"]]
+    data = census.parse_eits(json.dumps(rows), "resconst")
+    assert census.compute_housing(data)["starts"]["latest"] == 1.275
+    assert "ACOMPLETIONS/SINGLE/yes" in census.combinations(data)
+    # the same duplicate in a series the page uses stops that series and names the time slots
+    rows += [["1290", "TOTAL", "2", "no", "STARTS", "yes", "2026-08"]]
+    with pytest.raises(common.SourceError, match=r"STARTS/TOTAL/yes has 2 values for 2026-08: "
+                                                 r"time_slot_id 0 = 1275.0, time_slot_id 2 = 1290.0"):
+        census.compute_housing(census.parse_eits(json.dumps([h] + rows[1:]), "resconst"))
+
+
+def test_census_identical_values_in_two_slots_are_one_value():
+    from conftest import text as fx
+    from sources import census
+    rows = json.loads(fx("census_eits_doc_sample_resconst.json"))
+    rows += [["1275", "TOTAL", "1", "no", "STARTS", "yes", "2026-08"]]
+    assert census.compute_housing(census.parse_eits(json.dumps(rows), "resconst"))["starts"]["latest"] == 1.275
+
+
+def test_run_summary_lists_census_codes_and_added_values(tmp_path, offline, capsys):
+    rc, _ = run(tmp_path, dry_run=True)
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "### Census EITS code combinations" in out and "- resconst (4): PERMITS/TOTAL/no, PERMITS/TOTAL/yes, STARTS/TOTAL/no, STARTS/TOTAL/yes" in out
+    # July and August are added inside the control-group window: no pairing with September's value
+    assert "| `CONS.ctrl.v` | added: 0.1 | 2026-07 | Census |" in out
+    # the newest par date still shows the previous newest value
+    assert "| `DATA.par.y10` | 5.09 (2026-10-16) → 5.15 | 2026-10-19 | Treasury |" in out
+
+
+def test_contact_user_agent_for_bls_and_dol(monkeypatch):
+    import requests
+    from sources import bls, dol
+    seen = []
+
+    def fake(method, url, headers=None, timeout=None, **kw):
+        seen.append((url, headers["User-Agent"]))
+        raise requests.ConnectionError("refused")
+    monkeypatch.setattr(requests, "request", fake)
+    monkeypatch.setattr(common.time, "sleep", lambda s: None)  # skip the 5/15/45 s retry waits
+    token = "contact-token-for-test"
+    for call in (lambda: bls.get("", TODAY, token), lambda: bls.get_calendar(token), lambda: dol.get(token)):
+        with pytest.raises(common.SourceError) as e:
+            call()
+        assert token not in str(e.value)
+    assert [u for u, _ in seen] == [bls.URL_API] * 4 + [bls.URL_ICS] * 4 + [dol.URL] * 4
+    assert all(ua == f"yield-regime-monitor/1.0 (automated data refresh; contact: {token})" for _, ua in seen)
+    seen.clear()
+    with pytest.raises(common.SourceError):
+        dol.get(None)
+    assert seen[0][1] == common.USER_AGENT  # no contact set: the browser User-Agent
+
+
+def test_contact_is_never_printed(tmp_path, offline, capsys, monkeypatch):
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+    token = "contact-token-for-test"
+    rc, _ = run(tmp_path, keys={"CONTACT_EMAIL": token})
+    out = capsys.readouterr().out
+    assert rc == 0 and token not in out and "Contact User-Agent for BLS and DOL: set." in out
+    for p in tmp_path.iterdir():
+        assert token not in p.read_text(encoding="utf-8")
+
+
+def test_claims_fall_back_to_fred_icsa(tmp_path, offline):
+    from sources import fred
+
+    def blocked(*a):
+        raise common.SourceError("https://www.dol.gov/ui/data.pdf: HTTP 403")
+    offline["dol"] = blocked
+    good = offline["fred_icsa"]
+    offline["fred_icsa"] = lambda: {**good(), "2026-10-17": 207000.0}
+    rc, new = run(tmp_path)
+    b = u.load_page(new)
+    s = next(r for r in b["SCORE"] if r["id"] == "claims")
+    assert rc == 0 and (s["period"], s["latest"], s["pperiod"], s["prior"]) == ("2026-10-17", 207, "2026-10-10", 199)
+    row = next(r for r in b["LOG"] if r[0] == "Initial claims")
+    assert row[1:4] == ["207k", "Week to Oct 17", "FRED ICSA (fallback)"]
+    assert row[5] == "New Oct 17. Fallback: FRED ICSA."
+    assert fred.icsa({"2026-10-03": 198000.0, "2026-10-10": 199000.0})["latest"] == 199
+
+
+def test_claims_fallback_same_week_rereads_seed(tmp_path, offline):
+    def blocked(*a):
+        raise common.SourceError("HTTP 403")
+    offline["dol"] = blocked
+    rc, new = run(tmp_path)  # ICSA shows the seeded week: values must equal the seed (199 / 198)
+    row = next(r for r in u.load_page(new)["LOG"] if r[0] == "Initial claims")
+    assert rc == 0 and row[5] == "No new release. Fallback: FRED ICSA."
+
+
+def test_hy_oas_skips_bond_market_holiday_oct_12(tmp_path, offline):
+    from sources import fred
+    good = offline["fred"]
+
+    def with_columbus_day():
+        obs, src = good()
+        return {**obs, "2026-10-12": 3.11}, src   # FRED publishes a value on Columbus Day
+    offline["fred"] = with_columbus_day
+    rc, new = run(tmp_path)
+    daily = u.load_page(new)["DATA"]["credit"]["daily"]
+    assert rc == 0 and [d for d, _ in daily] == ["2026-10-08", "2026-10-09", "2026-10-13", "2026-10-14",
+                                                 "2026-10-15", "2026-10-16"]
+    assert daily == blocks()["DATA"]["credit"]["daily"]   # the five-session change spans trading days
+    trading = {"2026-10-09", "2026-10-13"}
+    kept = fred.trading_days_only({"2026-10-09": 1.0, "2026-10-12": 1.0, "2026-10-13": 1.0, "2026-10-14": 1.0}, trading)
+    assert sorted(kept) == ["2026-10-09", "2026-10-13", "2026-10-14"]  # a business day after the par file is kept

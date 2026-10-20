@@ -19,7 +19,7 @@ A one-page dashboard of what is driving U.S. Treasury yields: real yields versus
 | Payrolls, unemployment, earnings, CPI, PPI | BLS API v2 | none |
 | GDP, investment, final sales, saving rate, real PCE, core PCE | BEA API | none |
 | Starts, permits, retail control group | Census EITS API | none |
-| Initial claims | Department of Labor `data.pdf` | none |
+| Initial claims | Department of Labor `data.pdf` | FRED `ICSA` (no tie check) |
 | GDPNow | Atlanta Fed workbook | Atlanta Fed page |
 | Industrial production | Fed G.17 summary table | the release's opening sentence |
 | Consumer sentiment | University of Michigan CSV files (final readings) | none |
@@ -42,7 +42,7 @@ Every number on the page comes from seven one-line JavaScript objects between th
 6. Array lengths and date order.
 7. The page script parses (`node --check`) and Node reads the blocks back unchanged.
 
-Every value keeps its own data date. A source with nothing new keeps its old value and date (the page flags anything more than 10 days older than `DATA.updated`). A source that shows a newer date but whose value cannot be read or fails a tie gets `null` under the new date, a log row saying so, and an issue. It also writes `data/summary.json` for other pages.
+Every value keeps its own data date. A source with nothing new keeps its old value and date (the page flags anything more than 10 days older than `DATA.updated`). A source that shows a newer date but whose value cannot be read or fails a tie gets `null` under the new date, a log row saying so, and an issue. HY OAS keeps only dates that are in the Treasury par yield file, so bond-market holidays are skipped and the five-session change spans trading days. It also writes `data/summary.json` for other pages.
 
 The workflow commits only when a data value changed and every check passed, using the repository variables `COMMIT_NAME` and `COMMIT_EMAIL`. If a check fails, nothing is committed, the run fails, and an issue titled "Data update needs attention" is opened or commented on.
 
@@ -61,7 +61,7 @@ python scripts/update.py --dry-run
 ### Repository settings
 
 - Secrets: `BLS_API_KEY`, `BEA_API_KEY`, `CENSUS_API_KEY`, `FRED_API_KEY`, `EIA_API_KEY`.
-- Variables: `COMMIT_NAME`, `COMMIT_EMAIL` (the GitHub no-reply address).
+- Variables: `COMMIT_NAME`, `COMMIT_EMAIL` (the GitHub no-reply address). `COMMIT_EMAIL` is also sent, at run time only, as the contact in the User-Agent for BLS and the Department of Labor, which block anonymous automated clients.
 - Pages: deploy from the default branch, root folder.
 
 ## Not automated

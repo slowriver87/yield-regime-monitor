@@ -37,7 +37,7 @@ def _request(method: str, url: str, timeout: int, **kw):
     return requests.request(method, url, headers=headers, timeout=timeout, **kw)
 
 
-def fetch(url: str, timeout: int = TIMEOUT, waits=RETRY_WAITS, sleep=time.sleep,
+def fetch(url: str, timeout: int = TIMEOUT, waits=RETRY_WAITS, sleep=None,
           method: str = "GET", label: str | None = None, **kw) -> bytes:
     """One try plus a retry after each wait. A 404 is not retried. `label` replaces the URL in
     error messages, so a URL that carries an API key is never printed."""
@@ -58,8 +58,16 @@ def fetch(url: str, timeout: int = TIMEOUT, waits=RETRY_WAITS, sleep=time.sleep,
             if isinstance(e, requests.HTTPError) and e.response is not None:
                 last = f"HTTP {e.response.status_code}"
             if attempt < len(waits):
-                sleep(waits[attempt])
+                (sleep or time.sleep)(waits[attempt])
     raise SourceError(f"{label or url}: {last}")
+
+
+def contact_headers(contact: str | None) -> dict:
+    """BLS and DOL ask automated clients to identify themselves with a contact address. The address
+    comes from the environment at run time and is only ever sent in this header."""
+    if not contact:
+        return {}
+    return {"User-Agent": f"yield-regime-monitor/1.0 (automated data refresh; contact: {contact})"}
 
 
 def fetch_once(url: str, timeout: int = FRED_TIMEOUT, **kw) -> bytes:
