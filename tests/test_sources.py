@@ -11,7 +11,8 @@ import update as u
 from sources import (auctions, bea, bls, census, common, dol, eia, factset, fomc, fred, freddie, g17,
                      gdpnow, nyfed, treasury, umich)
 
-PAGE = u.load_page((u.ROOT / "index.html").read_text(encoding="utf-8"))
+# The seed page as merged (frozen): the live index.html changes with every data commit
+PAGE = u.load_page((FIX / "index_seed.html").read_text(encoding="utf-8"))
 D = PAGE["DATA"]
 SCORE = {r["id"]: r for r in PAGE["SCORE"]}
 

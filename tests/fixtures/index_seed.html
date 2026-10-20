@@ -1,0 +1,763 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Yield Regime Monitor</title>
+<meta name="description" content="Why U.S. Treasury yields are moving and whether it is starting to strain credit, housing, jobs, consumers and equity valuations. Built from public data sources.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column (max 1180px). Header, education note, current read, rates strip,
+   regime tiles, history, pressure charts, scorecard, consumer tiles, calculator, next releases,
+   notes, data check log, footer. Shared rules are copied from the Public Debt Monitor. */
+:root {
+  --bg: #f2f4f7;
+  --card: #ffffff;
+  --fg: #141d27;
+  --muted: #5a6875;
+  --faint: #8b97a3;
+  --line: #d9dfe6;
+  --grid: #e8ecf0;
+  --pub: #2a78d6;
+  --gov: #eb6834;
+  --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4;
+  --good: #1e7f3a; --bad: #c0392b;
+  --font-sans: "Libre Franklin", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #101519; --card: #181f26; --fg: #edf1f4; --muted: #a3afba; --faint: #76838f;
+    --line: #2b3640; --grid: #222b34; --pub: #3987e5; --gov: #e0602b;
+    --s3: #199e70; --s4: #c98500; --s5: #d55181; --good: #4cc26a; --bad: #ef6b5c;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #101519; --card: #181f26; --fg: #edf1f4; --muted: #a3afba; --faint: #76838f;
+  --line: #2b3640; --grid: #222b34; --pub: #3987e5; --gov: #e0602b;
+  --s3: #199e70; --s4: #c98500; --s5: #d55181; --good: #4cc26a; --bad: #ef6b5c;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-sans); font-size: 14px; line-height: 1.45; margin: 0; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-inline: 16px; padding-block: 28px 48px; }
+h1, h2, h3 { text-wrap: balance; margin: 0; }
+h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.01em; }
+h2 { font-size: 15px; font-weight: 600; }
+.eyebrow { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
+.sub { color: var(--muted); font-size: 13px; }
+a { color: var(--pub); }
+header { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: flex-end; justify-content: space-between; margin-bottom: 20px; }
+header .sub { text-wrap: pretty; }
+.disclaimer { margin: -6px 0 16px; padding: 10px 14px; border-radius: 6px; background: #163a6b; color: #ffffff; font-size: 13px; text-wrap: pretty; }
+.disclaimer b { color: #ffffff; font-weight: 700; }
+header .meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); font-size: 12px; color: var(--muted); background: var(--card); }
+.pill b { color: var(--fg); font-weight: 600; }
+.tile { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.tile .label { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.tile .value { font-size: 30px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.1; }
+.tile .delta { font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 12px; font-variant-numeric: tabular-nums; }
+.tile .delta b { font-weight: 600; color: var(--fg); }
+.tile svg { width: 100%; height: 34px; display: block; margin-top: 4px; }
+.swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; flex: none; }
+.stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 22px; align-content: start; }
+.stat { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; min-width: 0; display: flex; flex-direction: column; }
+.stat .k { font-size: 11px; color: var(--muted); min-height: 2.8em; display: flex; align-items: flex-end; }
+.stat .v { font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.stat .d { font-size: 11px; color: var(--muted); }
+section.card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 16px 18px; margin-bottom: 16px; min-width: 0; }
+.card-head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
+.card-head .sub { max-width: none; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.chart { position: relative; width: 100%; overflow-x: auto; overflow-y: hidden; }
+.chart svg { width: 100%; height: auto; display: block; overflow: visible; }
+.chart .vlab { paint-order: stroke; stroke: var(--card); stroke-width: 4px; stroke-linejoin: round; }
+.chart text { font-family: var(--font-sans); font-size: 11px; fill: var(--muted); }
+.chart .grid line { stroke: var(--grid); stroke-width: 1; }
+.chart .axis line { stroke: var(--line); }
+.tip { position: absolute; pointer-events: none; background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; font-size: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); min-width: 170px; z-index: 2; display: none; }
+.tip .t { font-weight: 600; margin-bottom: 4px; }
+.tip .r { display: flex; justify-content: space-between; gap: 14px; font-variant-numeric: tabular-nums; }
+.tip .r span:first-child { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+.two { display: grid; grid-template-columns: 1.25fr 1fr; gap: 16px; margin-bottom: 16px; }
+.two > section.card { margin-bottom: 0; }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 12.5px; font-variant-numeric: tabular-nums; table-layout: fixed; }
+th, td { padding: 5px 6px; text-align: right; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+th { font-weight: 600; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+th:first-child, td:first-child { text-align: left; }
+td.num { font-family: var(--font-mono); font-size: 12px; }
+tr.group td { color: var(--muted); font-weight: 600; border-bottom: 0; padding-top: 10px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+tr.total td { font-weight: 600; border-top: 1px solid var(--line); }
+.pos { color: var(--good); } .neg { color: var(--bad); }
+details { margin-top: 6px; }
+summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+.notes { font-size: 12.5px; color: var(--muted); }
+.notes p { margin: 6px 0; }
+footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
+footer p { margin: 4px 0; }
+footer .srcs ul { margin: 4px 0 0; padding-left: 18px; columns: 2; column-gap: 32px; }
+footer .srcs li { break-inside: avoid; margin-bottom: 2px; }
+
+/* ---- Yield Regime Monitor additions (same tokens) ---- */
+[hidden] { display: none !important; }
+:root { --warn: var(--s4); --serious: var(--gov); --crit: var(--bad); }
+.dek { color: var(--muted); font-size: 13px; margin: 4px 0 10px; text-wrap: pretty; }
+.sec-title { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline; justify-content: space-between; margin: 24px 0 10px; }
+.sec-title .sub { max-width: 70ch; }
+.read { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 16px 18px; margin-bottom: 16px; }
+.read h2 { font-size: 18px; font-weight: 600; text-wrap: pretty; margin: 4px 0 10px; }
+.read .cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 28px; }
+.read .cols h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; margin-bottom: 3px; }
+.read .cols p { margin: 0; font-size: 13px; text-wrap: pretty; }
+.read .auto { font-size: 11px; color: var(--faint); margin-top: 10px; }
+.stat .v { font-family: var(--font-mono); }
+.stat.stale .v { color: var(--muted); }
+.stat .d.warnd { color: var(--bad); }
+.tiles5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 14px; }
+.tiles4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 14px; }
+.tile.sig { position: relative; overflow: hidden; padding-left: 18px; }
+.tile.sig::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--stripe, var(--line)); }
+.tile.sig .value { font-family: var(--font-mono); font-size: 26px; }
+.tile.sig .value.txt { font-family: var(--font-sans); font-size: 22px; }
+.tile.sig .value small { font-size: 12px; color: var(--muted); font-weight: 500; margin-left: 4px; }
+.tile .desc { font-size: 12.5px; color: var(--muted); text-wrap: pretty; }
+.tile .rule { font-size: 11.5px; color: var(--faint); }
+.st { display: inline-flex; align-items: center; gap: 6px; width: max-content; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; padding: 2px 8px; border-radius: 999px; border: 1px solid currentColor; }
+.st i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.st-good { --stripe: var(--good); } .st-good .st { color: var(--good); }
+.st-warn { --stripe: var(--warn); } .st-warn .st { color: var(--warn); }
+.st-serious { --stripe: var(--serious); } .st-serious .st { color: var(--serious); }
+.st-crit { --stripe: var(--crit); } .st-crit .st { color: var(--crit); }
+.st-none { --stripe: var(--line); } .st-none .st { color: var(--muted); }
+.tile details summary { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+.tile details p { font-size: 12.5px; color: var(--muted); margin: 6px 0 0; text-wrap: pretty; }
+.charts { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.charts > section.card { margin-bottom: 0; }
+.cnote { font-size: 12px; color: var(--muted); margin: 8px 0 0; text-wrap: pretty; }
+.comm { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 12px 24px; }
+.comm h3 { font-size: 13.5px; font-weight: 600; margin-bottom: 3px; }
+.comm p { margin: 0; font-size: 13px; color: var(--muted); text-wrap: pretty; }
+.comm p.auto { color: var(--fg); }
+.tag { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--faint); font-weight: 600; }
+.hbar { display: grid; gap: 7px; font-size: 12.5px; }
+.hb { display: grid; grid-template-columns: minmax(130px, 34%) 1fr; gap: 10px; align-items: center; }
+.hb .nm small { display: block; color: var(--faint); font-size: 10.5px; }
+.hb .track { position: relative; height: 18px; }
+.hb .bar { position: absolute; left: 0; top: 3px; height: 12px; border-radius: 0 4px 4px 0; background: var(--c); }
+.hb .val { position: absolute; top: 0; font-family: var(--font-mono); font-size: 12px; white-space: nowrap; }
+.hb .med { position: absolute; top: -4px; bottom: -4px; border-left: 1px dashed var(--faint); }
+.hb.now .nm { font-weight: 600; }
+.hb.now .bar { outline: 2px solid var(--fg); outline-offset: 1px; }
+#score { min-width: 760px; }
+#score td, #score th { white-space: normal; vertical-align: top; padding: 7px 8px; }
+#score td:nth-child(2), #score td:nth-child(3), #score th:nth-child(2), #score th:nth-child(3) { text-align: right; }
+#score td.what { color: var(--muted); text-align: left; }
+#score th.what { text-align: left; }
+.dir { font-family: var(--font-mono); font-size: 12px; white-space: nowrap; }
+.calc { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.ctrl { display: grid; gap: 4px; margin-bottom: 12px; }
+.ctrl label { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); }
+.ctrl output { font-family: var(--font-mono); color: var(--fg); font-weight: 500; }
+input[type=range] { width: 100%; accent-color: var(--pub); }
+input[type=range]:focus-visible { outline: 2px solid var(--pub); outline-offset: 3px; }
+.btn { font: inherit; font-size: 12.5px; font-weight: 600; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 6px 12px; cursor: pointer; }
+.btn:focus-visible { outline: 2px solid var(--pub); outline-offset: 2px; }
+.rrow { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; border-bottom: 1px solid var(--grid); padding: 7px 0; }
+.rrow span { font-size: 13px; color: var(--muted); }
+.rrow b { font-family: var(--font-mono); font-size: 17px; font-weight: 500; }
+.gapbar { height: 10px; border-radius: 5px; background: var(--grid); position: relative; overflow: hidden; margin: 8px 0; }
+.gapbar i { position: absolute; top: 0; bottom: 0; }
+.gapbar::after { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--faint); }
+.cal { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr)); gap: 10px; }
+.cal > div { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; display: grid; gap: 2px; align-content: start; }
+.cal .when { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); }
+.cal .ev { font-weight: 600; font-size: 13.5px; }
+.cal .why { font-size: 12.5px; color: var(--muted); text-wrap: pretty; }
+.notelist { display: grid; gap: 12px; }
+.notelist .n { border-top: 1px solid var(--grid); padding-top: 10px; }
+.notelist .n:first-child { border-top: 0; padding-top: 0; }
+.notelist .n p { margin: 4px 0 0; font-size: 13px; color: var(--muted); text-wrap: pretty; }
+.notelist .old { color: var(--bad); font-size: 11.5px; }
+#log { min-width: 860px; }
+#log td { white-space: normal; vertical-align: top; }
+#log th, #log td { text-align: left; }
+#log td:nth-child(2) { font-family: var(--font-mono); font-size: 12px; }
+@media (max-width: 980px) {
+  .tiles5 { grid-template-columns: repeat(2, 1fr); }
+  .tiles4 { grid-template-columns: repeat(2, 1fr); }
+  .stats { grid-template-columns: repeat(3, 1fr); }
+  .charts, .calc, .two { grid-template-columns: 1fr; }
+  .read .cols { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .tiles5, .tiles4 { grid-template-columns: 1fr; }
+  .stats { grid-template-columns: repeat(2, 1fr); }
+  section.card, .read { padding: 12px; }
+  footer .srcs ul { columns: 1; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div>
+    <div class="eyebrow">U.S. Treasury · Federal Reserve · BLS · BEA · Census · Freddie Mac</div>
+    <h1>Yield Regime Monitor</h1>
+    <div class="sub">Why U.S. Treasury yields are moving, and whether higher rates are starting to strain credit, housing, jobs, consumers and stock valuations.</div>
+  </div>
+  <div class="meta">
+    <span class="pill">Yields <b id="p-yields"></b></span>
+    <span class="pill">Credit <b id="p-credit"></b></span>
+    <span class="pill">Valuation <b id="p-val"></b></span>
+    <span class="pill">Updated <b id="p-upd"></b></span>
+    <a class="pill" href="https://home.treasury.gov/resource-center/data-chart-center/interest-rates/TextView?type=daily_treasury_yield_curve" target="_blank" rel="noopener">Source: Treasury ↗</a>
+  </div>
+</header>
+
+<p class="disclaimer"><b>For education only. Not financial advice.</b> Figures come from public government sources and are checked, but may contain errors. Check the original source before relying on it.</p>
+
+<div class="read" id="read"></div>
+
+<div class="stats" id="tape" aria-label="Rates strip"></div>
+
+<div class="sec-title"><h2>Regime signals</h2><div class="sub">Each tile answers one question about why yields are where they are and whether that is starting to break something. Colors follow the fixed rule printed in each tile.</div></div>
+<div class="tiles5" id="sig"></div>
+<section class="card"><div class="tag">Automatic summary</div><div class="comm" id="sigComm"></div></section>
+
+<div class="sec-title"><h2>Historical context</h2><div class="sub">Where today's credit spread and equity yield gap sit against past cycles since the late 1990s.</div></div>
+<div class="charts">
+  <section class="card">
+    <h2>High-yield credit spread: past stress peaks vs. tights</h2>
+    <p class="dek">Spreads rose above 800bp around each of the three recessions since 2000 (the 2002 peak came after the 2001 recession ended), and the larger credit scares (2002, 2011, 2016, late 2018, 2022, March 2023) took them above about 500bp. Smaller scares did not: August 2024 peaked at 393bp, October 2023 at 453bp and April 2025 at 461bp.</p>
+    <div class="legend"><span><i class="swatch" style="background:var(--gov)"></i>Stress peak</span><span><i class="swatch" style="background:var(--pub)"></i>Cycle tight</span><span><i class="swatch" style="background:var(--faint)"></i>Long-run median ≈ 450bp</span></div>
+    <div id="hy-hist" class="hbar" style="margin-top:10px"></div>
+    <p class="cnote">Basis points, ICE BofA US High Yield OAS. Episode values come from secondary compilations of FRED history (eco3min.fr, Convex, Trading Economics, CFA Institute) and are approximate where marked ~. The 2002 and 2011 figures are weekly closes. March 2023 is 522bp (Mar 24, 2023; single secondary source). The median is roughly 440–450bp depending on the period (New York Life Investments: 438bp over the 20 years to mid-2024).</p>
+    <div class="comm" style="margin-top:12px">
+      <div><h3>Tight is not a sell signal</h3><p>Spreads stayed below 400bp for almost three years in 2004–07 before the crisis (New York Life Investments). Tight spreads mean investors get little pay for risk, not that trouble is imminent.</p></div>
+      <div><h3>The turn is what matters</h3><p>In 2007, spreads began widening in June, as Federal Reserve staff noted at the Aug 7, 2007 FOMC meeting, while the S&amp;P 500 went on to a record close on Oct 9, 2007. Credit moved first that time. It does not do so reliably: in April 2025 spreads widened in the same days that stocks fell (3.42% on Apr 2 to 4.61% on Apr 7), and Reuters reported in November 2018 that high yield had lagged that sell-off.</p></div>
+      <div><h3>Energy exposure</h3><p>Energy was about 11.5% of the ICE BofA US High Yield Index on Oct 8, 2026 (State Street's SPHY fund page), and has been higher: Muzinich put it above 14% by mid-2013 (single source). High oil prices support those issuers; a sharp fall in oil hurts them, as it did in 2016.</p></div>
+    </div>
+  </section>
+  <section class="card">
+    <h2>Equity yield gap since 1999</h2>
+    <p class="dek">Forward earnings yield minus the 10-year Treasury yield. On this chart it was negative at year-end 1999 to 2001, positive at every year-end from 2002 to 2024, and above +3 pts at every year-end from 2008 to 2021. It was also negative before 1999: the Fed noted in July 1997 that the 10-year yield exceeded the forward earnings yield by the most since 1991.</p>
+    <div class="chart" id="c5"></div>
+    <p class="cnote" id="c5note"></p>
+    <div class="comm" style="margin-top:12px">
+      <div><h3>Valuation, not timing</h3><p>A wide gap in 2008 did not mean stocks were safe; it was largely a product of the crash itself. The S&amp;P 500 fell 56.8% from its record close of 1,565 on Oct 9, 2007 to a closing low of 677 on Mar 9, 2009, which pushed the earnings yield up, while the 10Y fell from about 4.7% to about 2.1% in December 2008.</p></div>
+      <div><h3>The earnings were wrong</h3><p>The gap uses analysts' forward estimates, and those lagged the collapse. Actual 2008 operating EPS came in at $49.51 and reported EPS at $14.88 after write-downs (S&amp;P figures, via Cambridge Associates). Part of the 6-point "cushion" was measured against earnings that never arrived.</p></div>
+      <div><h3>2007 is the relevant lesson</h3><p>At the end of 2007 the gap was about +2.8 pts on this chart's reconstruction, and stocks still fell by more than half. Credit gave the warning that time: HY spreads went from a record-tight 241bp in June 2007 to 2,182bp in December 2008.</p></div>
+      <div><h3>Where it does work</h3><p>Over years, not months. The high readings of early 2009 and 2011–12 came ahead of multi-year gains in stocks, even when the first months hurt. Two episodes are not a rule. A gap near zero does not predict a crash; it means little margin for error if a shock hits.</p></div>
+    </div>
+  </section>
+</div>
+
+<div class="sec-title"><h2>Where the pressure shows</h2><div class="sub">Hover or tap a chart for values.</div></div>
+<div class="charts">
+  <section class="card">
+    <h2>10Y yield split: real vs. inflation expectations</h2>
+    <p class="dek">Nominal 10Y = real (TIPS) yield + breakeven. A rising real line with a flat breakeven points to a growth, Fed-path or term-premium story, not an inflation scare.</p>
+    <div class="legend"><span><i class="swatch" style="background:var(--pub)"></i>10Y real yield</span><span><i class="swatch" style="background:var(--gov)"></i>10Y breakeven</span></div>
+    <div class="chart" id="c1"></div>
+    <p class="cnote" id="c1note"></p>
+  </section>
+  <section class="card">
+    <h2>High-yield credit spread</h2>
+    <p class="dek">Mainly the market's price of default risk. This page treats ~3.5% as the line between watch and stress.</p>
+    <div class="chart" id="c2"></div>
+    <p class="cnote" id="c2note"></p>
+  </section>
+  <section class="card">
+    <h2>30-year mortgage rate</h2>
+    <p class="dek">The 30-year fixed rate moves with the 10-year Treasury yield, not the 30-year, plus a spread that varies over time.</p>
+    <div class="chart" id="c3"></div>
+    <p class="cnote" id="c3note"></p>
+  </section>
+  <section class="card">
+    <h2>Unemployment rate</h2>
+    <p class="dek">A lagging indicator. The Sahm rule signals the start of a recession when the 3-month average unemployment rate is 0.5 pts or more above its lowest 3-month average of the previous 12 months. It is not infallible: it crossed 0.5 from July to September 2024 and no NBER-dated recession followed.</p>
+    <div class="chart" id="c4"></div>
+    <p class="cnote" id="c4note"></p>
+  </section>
+</div>
+
+<div class="sec-title"><h2>Economy vs. yields: the scorecard</h2><div class="sub">Rate-sensitive sectors usually react first, then investment, then hiring. Arrows compare the latest reading with the one before it.</div></div>
+<section class="card">
+  <div class="tablewrap"><table id="score"></table></div>
+  <p class="cnote">Tightening typically reaches housing first, then business investment, then hiring. Rules of thumb put the peak effect of a rate change 12 to 24 months out, though Fed governor Waller argued in July 2023 that the lags may now be shorter (Federal Reserve).</p>
+</section>
+
+<div class="sec-title"><h2>Consumer</h2><div class="sub">Consumer spending is about two-thirds of GDP. These four readings show whether households are still spending, and what they are spending with.</div></div>
+<div class="tiles4" id="cons"></div>
+<section class="card"><div class="tag">Automatic summary</div><div class="comm" id="consComm"></div></section>
+
+<div class="sec-title"><h2>Equity yield gap calculator</h2><div class="sub" id="calcSub"></div></div>
+<div class="calc">
+  <section class="card" style="margin-bottom:0">
+    <div class="ctrl"><label for="y10">10Y Treasury yield <output id="y10o"></output></label><input type="range" id="y10" min="3" max="7" step="0.01"></div>
+    <div class="ctrl"><label for="spx">S&amp;P 500 level <output id="spxo"></output></label><input type="range" id="spx" min="5000" max="10000" step="1"></div>
+    <div class="ctrl"><label for="eps">Forward 12-month EPS <output id="epso"></output></label><input type="range" id="eps" min="300" max="500" step="0.5"></div>
+    <div class="ctrl"><label for="ry">10Y real yield (TIPS) <output id="ryo"></output></label><input type="range" id="ry" min="0.5" max="4" step="0.01"></div>
+    <button class="btn" id="reset" type="button">Reset to latest data</button>
+  </section>
+  <section class="card" style="margin-bottom:0" aria-live="polite">
+    <div class="rrow"><span>Forward P/E</span><b id="pe"></b></div>
+    <div class="rrow"><span>Forward earnings yield</span><b id="ey"></b></div>
+    <div class="rrow"><span>Gap vs. nominal 10Y</span><b id="gapN"></b></div>
+    <div class="gapbar" aria-hidden="true"><i id="gapBar"></i></div>
+    <div class="rrow"><span>Gap vs. real 10Y (stocks are a claim on real earnings)</span><b id="gapR"></b></div>
+    <div class="rrow"><span>S&amp;P level for a 1.0-pt nominal gap</span><b id="lvl1"></b></div>
+    <p class="cnote">Bar spans −3 to +3 pts around zero. Earnings yield is forward EPS ÷ price; it is a valuation yardstick, not a return forecast. On this page's reconstructed year-end values the gap was above +3 pts at every year-end from 2010 to 2019.</p>
+  </section>
+</div>
+<section class="card" style="margin-top:16px"><div class="comm" id="calcComm"></div></section>
+
+<div class="sec-title"><h2>Next releases</h2><div class="sub">Scheduled data and Treasury auctions that update this page, from the publishers' own calendars. Times are Eastern.</div></div>
+<div class="cal" id="cal"></div>
+
+<div class="sec-title"><h2>Notes</h2><div class="sub">Hand-written context: Fed speakers, causes, markets abroad. Each note carries its date and is not updated automatically.</div></div>
+<section class="card"><div class="notelist" id="notes"></div></section>
+
+<section class="card">
+  <h2>Data check log</h2>
+  <p class="dek">One row per headline number. "Checked" is the last date the update script read the value from its source; an older date means it was not re-read. All dates are 2026 unless stated.</p>
+  <div class="tablewrap"><table id="log"></table></div>
+  <p class="cnote" id="logNote">Explanations audited Oct 18, 2026. Next audit Nov 18, 2026.</p>
+</section>
+
+<footer>
+  <p><strong>Reading it.</strong> Treasury yields are Treasury's daily par yields; market quotes at the close can differ by a basis point. The 10-year breakeven is the 10-year par yield minus the 10-year real (TIPS) par yield. Signal thresholds and status labels are judgment calls, not model outputs, and each has given false signals; the known exceptions are noted beside the claims they qualify.</p>
+  <details class="srcs"><summary>Sources (16)</summary>
+    <ul>
+      <li><a href="https://home.treasury.gov/resource-center/data-chart-center/interest-rates/TextView?type=daily_treasury_yield_curve" target="_blank" rel="noopener">U.S. Treasury, daily par yield curve</a></li>
+      <li><a href="https://home.treasury.gov/resource-center/data-chart-center/interest-rates/TextView?type=daily_treasury_real_yield_curve" target="_blank" rel="noopener">U.S. Treasury, daily par real yield curve</a></li>
+      <li><a href="https://www.treasurydirect.gov/auctions/auction-query/" target="_blank" rel="noopener">TreasuryDirect, auction results and schedule</a></li>
+      <li><a href="https://www.newyorkfed.org/markets/reference-rates/effr" target="_blank" rel="noopener">New York Fed, effective federal funds rate and target range</a></li>
+      <li><a href="https://www.federalreserve.gov/releases/h15/" target="_blank" rel="noopener">Federal Reserve, H.15 selected interest rates (fallback)</a></li>
+      <li><a href="https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm" target="_blank" rel="noopener">Federal Reserve, FOMC calendar</a></li>
+      <li><a href="https://fred.stlouisfed.org/series/BAMLH0A0HYM2" target="_blank" rel="noopener">ICE BofA US High Yield OAS, via FRED</a></li>
+      <li><a href="https://www.freddiemac.com/pmms" target="_blank" rel="noopener">Freddie Mac, Primary Mortgage Market Survey</a></li>
+      <li><a href="https://www.bls.gov/bls/api_features.htm" target="_blank" rel="noopener">BLS, employment, CPI and PPI (Public Data API)</a></li>
+      <li><a href="https://apps.bea.gov/api/" target="_blank" rel="noopener">BEA, GDP and personal income and outlays (API)</a></li>
+      <li><a href="https://www.census.gov/econ/currentdata/" target="_blank" rel="noopener">Census, retail sales and new residential construction</a></li>
+      <li><a href="https://www.dol.gov/ui/data.pdf" target="_blank" rel="noopener">Department of Labor, weekly unemployment claims</a></li>
+      <li><a href="https://www.atlantafed.org/research-and-data/data/gdpnow" target="_blank" rel="noopener">Atlanta Fed, GDPNow</a></li>
+      <li><a href="https://www.sca.isr.umich.edu/" target="_blank" rel="noopener">University of Michigan, Surveys of Consumers</a></li>
+      <li><a href="https://www.newyorkfed.org/microeconomics/hhdc" target="_blank" rel="noopener">New York Fed, Household Debt and Credit Report</a></li>
+      <li><a href="https://insight.factset.com/topic/earnings" target="_blank" rel="noopener">FactSet Earnings Insight (forward P/E)</a></li>
+    </ul>
+  </details>
+  <p>Not every source is a government agency: Freddie Mac, the University of Michigan, FactSet and ICE (via FRED) are named where their figures appear.</p>
+  <p id="foot-note"></p>
+</footer>
+
+</div>
+
+<script>
+// ===== DATA BLOCKS (rewritten by scripts/update.py; one line each) =====
+const DATA = {"updated":"2026-10-19","fed":{"date":"2026-10-15","lo":3.75,"hi":4.0,"effr":3.88},"par":{"dates":["2026-10-15","2026-10-16"],"y2":[4.77,4.74],"y10":[5.1,5.09],"y30":[5.43,5.43]},"split":{"dates":["2026-09-30","2026-10-01","2026-10-02","2026-10-05","2026-10-06","2026-10-07","2026-10-08","2026-10-09","2026-10-13","2026-10-14","2026-10-15","2026-10-16"],"real":[2.93,2.88,2.92,2.95,2.91,2.92,2.87,2.91,2.88,2.84,2.78,2.74],"be":[2.36,2.36,2.36,2.36,2.36,2.36,2.35,2.33,2.33,2.35,2.32,2.35]},"credit":{"series":"BAMLH0A0HYM2","anchors":[["2026-06-24",2.76],["2026-07-29",2.87],["2026-08-28",2.6]],"daily":[["2026-10-08",3.15],["2026-10-09",3.11],["2026-10-13",3.16],["2026-10-14",3.25],["2026-10-15",3.23],["2026-10-16",3.31]]},"mortgage":{"monthly":[["2026-06",6.49],["2026-07",6.54],["2026-08",6.67]],"weekly":[["2026-09-10",6.76],["2026-09-17",6.95],["2026-09-24",7.03],["2026-10-01",7.28],["2026-10-08",7.4],["2026-10-15",7.4]],"yago":6.27},"wti":{"date":"2026-10-14","v":101.91},"auction":{"date":"2026-10-08","term":"30-Year Bond","high":5.618,"btc":2.54,"dealer":null,"indirect":72.3},"val":{"report":"2026-10-16","pe":19.0,"price":7744.06},"unrate":{"months":["2026-04","2026-05","2026-06","2026-07","2026-08","2026-09"],"v":[4.3,4.3,4.2,4.1,4.1,4.2]}};
+const SCORE = [{"id":"mort","grp":"Rate-sensitive (hit first)","label":"30Y mortgage rate (Freddie Mac)","unit":"%","dp":2,"latest":7.4,"period":"2026-10-15","prior":7.4,"pperiod":"2026-10-08","src":"Freddie Mac PMMS"},{"id":"starts","grp":"Rate-sensitive (hit first)","label":"Housing starts","unit":"M","dp":3,"latest":1.275,"period":"2026-08","prior":null,"pperiod":null,"src":"Census"},{"id":"permits","grp":"Rate-sensitive (hit first)","label":"Building permits","unit":"M","dp":3,"latest":1.403,"period":"2026-08","prior":null,"pperiod":null,"src":"Census"},{"id":"gdp","grp":"Output & demand","label":"Real GDP (annualized)","unit":"%","dp":1,"latest":2.2,"period":"2026Q2","prior":2.5,"pperiod":"2026Q1","src":"BEA"},{"id":"fspdp","grp":"Output & demand","label":"Final sales to private domestic purchasers","unit":"%","dp":1,"latest":4.6,"period":"2026Q2","prior":null,"pperiod":null,"src":"BEA"},{"id":"bfi","grp":"Output & demand","label":"Business investment (nonresidential fixed)","unit":"%","dp":1,"latest":9.0,"period":"2026Q2","prior":9.9,"pperiod":"2026Q1","src":"BEA"},{"id":"gdpnow","grp":"Output & demand","label":"GDPNow, current quarter","unit":"%","dp":1,"latest":3.6,"period":"2026-10-15","prior":null,"pperiod":null,"src":"Atlanta Fed","note":"Q3 2026 estimate"},{"id":"ip","grp":"Output & demand","label":"Industrial production (m/m)","unit":"%","dp":1,"latest":0.7,"period":"2026-09","prior":null,"pperiod":null,"src":"Federal Reserve G.17"},{"id":"nfp","grp":"Labor","label":"Nonfarm payrolls (monthly change)","unit":"k","dp":0,"latest":29,"period":"2026-09","prior":133,"pperiod":"2026-08","src":"BLS","avg3":51},{"id":"ur","grp":"Labor","label":"Unemployment rate","unit":"%","dp":1,"latest":4.2,"period":"2026-09","prior":4.1,"pperiod":"2026-08","src":"BLS"},{"id":"ahe","grp":"Labor","label":"Average hourly earnings (y/y)","unit":"%","dp":1,"latest":3.0,"period":"2026-09","prior":3.1,"pperiod":"2026-08","src":"BLS"},{"id":"claims","grp":"Labor","label":"Initial jobless claims (week)","unit":"k","dp":0,"latest":199,"period":"2026-10-10","prior":198,"pperiod":"2026-10-03","src":"Department of Labor"},{"id":"cpi","grp":"Inflation","label":"CPI (y/y)","unit":"%","dp":1,"latest":3.7,"period":"2026-09","prior":3.4,"pperiod":"2026-08","src":"BLS"},{"id":"core","grp":"Inflation","label":"Core CPI (y/y)","unit":"%","dp":1,"latest":2.6,"period":"2026-09","prior":2.4,"pperiod":"2026-08","src":"BLS"},{"id":"ppi","grp":"Inflation","label":"PPI final demand (y/y)","unit":"%","dp":1,"latest":6.3,"period":"2026-09","prior":null,"pperiod":null,"src":"BLS"},{"id":"pce","grp":"Inflation","label":"Core PCE prices (y/y)","unit":"%","dp":1,"latest":3.0,"period":"2026-08","prior":3.0,"pperiod":"2026-07","src":"BEA"}];
+const CONS = {"ctrl":{"months":["2026-09"],"v":[0.1],"released":"2026-10-15"},"save":{"months":["2026-07","2026-08"],"rate":[4.6,4.1],"realpce":[null,0.6]},"umich":{"month":"2026-09","ics":48.1,"px1":4.6,"prior":null},"card":{"q":"2026Q2","flow90":6.97,"yago":6.93,"bal":1263}};
+const CAL = [{"d":"2026-10-20","t":"8:30 am","ev":"Housing starts and permits (Sep)","src":"Census","id":"starts"},{"d":"2026-10-21","t":"1:00 pm","ev":"20-year bond auction","src":"Treasury","id":"auction"},{"d":"2026-10-22","t":"8:30 am","ev":"Initial jobless claims","src":"Department of Labor","id":"claims"},{"d":"2026-10-22","t":"12:00 pm","ev":"30-year mortgage rate","src":"Freddie Mac","id":"mort"},{"d":"2026-10-22","t":"1:00 pm","ev":"5-year TIPS auction","src":"Treasury","id":"auction"},{"d":"2026-10-23","t":"10:00 am","ev":"Consumer sentiment, final (Oct)","src":"University of Michigan","id":"umich"},{"d":"2026-10-26","t":"1:00 pm","ev":"2-year note auction","src":"Treasury","id":"auction"},{"d":"2026-10-27","t":"10:00 am","ev":"New home sales (Sep)","src":"Census","id":"nhs"},{"d":"2026-10-27","t":"1:00 pm","ev":"5-year note auction","src":"Treasury","id":"auction"},{"d":"2026-10-28","t":"2:00 pm","ev":"FOMC decision","src":"Federal Reserve","id":"fomc"},{"d":"2026-10-29","t":"8:30 am","ev":"GDP, advance (Q3)","src":"BEA","id":"gdp"},{"d":"2026-10-29","t":"8:30 am","ev":"Personal income and outlays (Sep)","src":"BEA","id":"pce"}];
+const NOTES = [{"date":"2026-10-19","title":"Homebuilders and China","text":"The NAHB/Wells Fargo builder index fell 3 points to 29 in October, the lowest since June 2012; 43% of builders cut prices, the highest share in NAHB's 2020–2026 series (NAHB). China's Q3 GDP grew 4.5% on the year, above the 4.4% Reuters poll and Q2's 4.3% (Reuters, Xinhua)."},{"date":"2026-10-16","title":"Three hot inflation prints, lower long yields","text":"September CPI (3.7% y/y), PPI final demand (+1.3% m/m) and import prices (+1.1% m/m) all came in hot in the week of Oct 14, yet the 10-year par yield ended the week at 5.09%, 15bp lower (Treasury). The breakeven stayed near 2.35%, so markets did not price a long-run inflation scare."}];
+const LOG = [["Fed funds target range","3.75–4.00%","Oct 15","New York Fed (EFFR API)","Oct 16","Seeded from the previous version of this page; the first script run re-reads it."],["2Y Treasury (par)","4.74%","Oct 16","Treasury par yield curve","Oct 19","Primary, read twice. Seeded from the previous version of this page; the first script run re-reads it."],["10Y Treasury (par)","5.09%","Oct 16","Treasury par yield curve","Oct 19","Primary, read twice. Seeded from the previous version of this page; the first script run re-reads it."],["30Y Treasury (par)","5.43%","Oct 16","Treasury par yield curve","Oct 19","Primary, read twice. Seeded from the previous version of this page; the first script run re-reads it."],["10Y real yield (par)","2.74%","Oct 16","Treasury real yield curve","Oct 19","Primary. Seeded from the previous version of this page; the first script run re-reads it."],["10Y breakeven","2.35%","Oct 16","Computed: par − real; FRED T10YIE agrees","Oct 19","Two sources agree. Seeded from the previous version of this page; the first script run re-reads it."],["HY OAS","3.31%","Oct 16","ICE BofA via FRED","Oct 19","Single source, read twice. Seeded from the previous version of this page; the first script run re-reads it."],["30Y mortgage","7.40%","Oct 15","Freddie Mac PMMS","Oct 15","Seeded from the previous version of this page; the first script run re-reads it."],["WTI spot (Cushing)","$101.91","Oct 14","EIA spot prices","Oct 19","Single source. Seeded from the previous version of this page; the first script run re-reads it."],["Latest coupon auction","30Y, btc 2.54","Oct 8","TreasuryDirect","Oct 9","Dealer share not yet read. Seeded from the previous version of this page; the first script run re-reads it."],["Forward P/E (FactSet)","19.0","Oct 16 report","FactSet Earnings Insight","Oct 16","Single source. Seeded from the previous version of this page; the first script run re-reads it."],["Unemployment rate","4.2%","Sep","BLS","Oct 9","Seeded from the previous version of this page; the first script run re-reads it."],["Nonfarm payrolls","+29k","Sep","BLS","Oct 9","Seeded from the previous version of this page; the first script run re-reads it."],["Average hourly earnings","3.0% y/y","Sep","BLS","Oct 9","Seeded from the previous version of this page; the first script run re-reads it."],["Initial claims","199k","Week to Oct 10","Department of Labor","Oct 15","Seeded from the previous version of this page; the first script run re-reads it."],["CPI / core CPI","3.7% / 2.6% y/y","Sep","BLS","Oct 14","Seeded from the previous version of this page; the first script run re-reads it."],["PPI final demand","6.3% y/y","Sep","BLS","Oct 15","Seeded from the previous version of this page; the first script run re-reads it."],["Core PCE","3.0% y/y","Aug","BEA","Oct 9","Seeded from the previous version of this page; the first script run re-reads it."],["Real GDP / final sales / business investment","2.2% / 4.6% / 9.0%","Q2","BEA","Oct 9","Seeded from the previous version of this page; the first script run re-reads it."],["GDPNow","3.6%","Oct 15","Atlanta Fed","Oct 15","Seeded from the previous version of this page; the first script run re-reads it."],["Industrial production","+0.7% m/m","Sep","Federal Reserve G.17","Oct 16","Seeded from the previous version of this page; the first script run re-reads it."],["Housing starts / permits","1.275M / 1.403M","Aug","Census","Oct 13","Seeded from the previous version of this page; the first script run re-reads it."],["Retail sales control group","+0.1% m/m","Sep","Computed from Census retail sales","Oct 15","Seeded from the previous version of this page; the first script run re-reads it."],["Saving rate / real spending","4.1% / +0.6%","Aug","BEA","Oct 9","Seeded from the previous version of this page; the first script run re-reads it."],["UMich sentiment (final)","48.1","Sep","University of Michigan","Oct 19","Final reading; Oct preliminary (46.3) is not in the CSV. Seeded from the previous version of this page; the first script run re-reads it."],["Card flow into 90+ days","6.97%","Q2","New York Fed","Oct 9","Seeded from the previous version of this page; the first script run re-reads it."]];
+const HIST = {"gap":{"x":["1999","2000","2001","2002","2003","2004","2005","2006","2007","2008","2009","2010","2011","2012","2013","2014","2015","2016","2017","2018","2019","2020","2021","2022","2023","2024","Jun'26"],"v":[-2.37,-0.36,-0.42,2.42,1.29,2.09,2.37,1.88,2.81,6.08,3.19,4.51,6.66,6.16,3.45,3.85,3.9,3.43,3.09,4.25,3.57,3.48,3.13,2.07,1.25,0.08,0.52]},"hy":[["Dot-com bust","2002","~1,100",1100,"p"],["Record tight","Jun 2007","241",241,"t"],["Global financial crisis","Dec 2008","2,182",2182,"p"],["Euro debt crisis","2011","~850",850,"p"],["Energy crash","Feb 2016","887",887,"p"],["COVID shock","Mar 2020","1,087",1087,"p"],["Rate shock","2022","~600",600,"p"],["Regional bank stress","Mar 2023","522",522,"p"],["Recent tight","Early 2025","259",259,"t"]]};
+// ===== END DATA BLOCKS =====
+
+// ---- Page logic. Everything below is drawn from the data blocks above. ----
+const $ = id => document.getElementById(id);
+const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const num = v => typeof v === "number" && isFinite(v);
+const f = (v, dp = 2) => num(v) ? v.toFixed(dp) : "n/a";
+const sgn = (v, dp = 2) => num(v) ? (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(dp) : "n/a";
+const bp = v => num(v) ? (v >= 0 ? "+" : "−") + Math.abs(Math.round(v * 100)) + "bp" : "n/a";
+const last = a => a[a.length - 1];
+// Dates: "2026-10-16" -> "Oct 16"; "2026-09" -> "Sep 2026"; "2026Q2" -> "Q2 2026"
+function dLabel(s, withYear) {
+  if (!s) return "n/a";
+  let m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (m) return MON[+m[2] - 1] + " " + (+m[3]) + (withYear ? ", " + m[1] : "");
+  m = /^(\d{4})-(\d{2})$/.exec(s);
+  if (m) return MON[+m[2] - 1] + " " + m[1];
+  m = /^(\d{4})Q(\d)$/.exec(s);
+  if (m) return "Q" + m[2] + " " + m[1];
+  return s;
+}
+const md = s => { const m = /^\d{4}-(\d{2})-(\d{2})$/.exec(s); return m ? (+m[1]) + "/" + (+m[2]) : s; };
+const daysBetween = (a, b) => Math.round((new Date(b + "T12:00:00Z") - new Date(a + "T12:00:00Z")) / 864e5);
+
+// ---------- Derived values (all computed here from the data blocks) ----------
+const P = DATA.par, S = DATA.split, C = DATA.credit, V = DATA.val;
+const y2 = last(P.y2), y10 = last(P.y10), y30 = last(P.y30), yDate = last(P.dates);
+const y2p = P.y2.length > 1 ? P.y2[P.y2.length - 2] : null, y10p = P.y10.length > 1 ? P.y10[P.y10.length - 2] : null;
+const curve = num(y2) && num(y10) ? y10 - y2 : null;
+const curveP = num(y2p) && num(y10p) ? y10p - y2p : null;
+const real = last(S.real), be = last(S.be), sDate = last(S.dates);
+const dReal = num(real) && num(S.real[0]) ? real - S.real[0] : null;
+const dBe = num(be) && num(S.be[0]) ? be - S.be[0] : null;
+const hy = C.daily.length ? last(C.daily)[1] : null, hyDate = C.daily.length ? last(C.daily)[0] : null;
+const hy5 = C.daily.length > 5 ? C.daily[C.daily.length - 6][1] : null;
+const hyChg5 = num(hy) && num(hy5) ? hy - hy5 : null;
+const hyPrev = C.daily.length > 1 ? C.daily[C.daily.length - 2][1] : null;
+const ey = num(V.pe) && V.pe > 0 ? 100 / V.pe : null;
+const eps = num(V.pe) && num(V.price) ? V.price / V.pe : null;
+const gap = num(ey) && num(y10) ? ey - y10 : null;
+const mortW = DATA.mortgage.weekly, mort = mortW.length ? last(mortW)[1] : null, mortDate = mortW.length ? last(mortW)[0] : null;
+const A = DATA.auction;
+
+// ---------- Status rules (fixed; printed in each tile) ----------
+function stDriver() {
+  if (!num(dReal) || !num(dBe)) return ["none", "Not known"];
+  if (dReal < 0 && dBe < 0) return ["good", "Easing"];
+  return Math.abs(dReal) >= Math.abs(dBe) ? ["good", "Growth-led"] : ["serious", "Inflation-led"];
+}
+function stCurve() {
+  if (!num(curve)) return ["none", "Not known"];
+  if (curve > 0) return ["good", "Not inverted"];
+  if (curve >= -0.25) return ["warn", "Flat"];
+  return ["crit", "Inverted"];
+}
+function stHY() {
+  if (!num(hy)) return ["none", "Not known"];
+  if (hy > 5) return ["crit", "Credit stress"];
+  if (hy >= 3.5) return ["serious", "Stress"];
+  if (hy >= 3 || (num(hyChg5) && hyChg5 > 0.25)) return ["warn", "Watch"];
+  return ["good", "Calm"];
+}
+function stAuction() {
+  if (!num(A.btc)) return ["none", "Not known"];
+  const weak = A.btc < 2.4 || (num(A.dealer) && A.dealer > 20);
+  return weak ? ["warn", "Soft"] : ["good", "Solid"];
+}
+function stGap(g) {
+  if (!num(g)) return ["none", "Not known"];
+  if (g >= 1.5) return ["good", "Cushion"];
+  if (g >= 0.5) return ["warn", "Thin"];
+  return ["crit", "No cushion"];
+}
+
+// ---------- Header pills ----------
+$("p-yields").textContent = dLabel(yDate, true);
+$("p-credit").textContent = dLabel(hyDate, true);
+$("p-val").textContent = dLabel(V.report, true);
+$("p-upd").textContent = dLabel(DATA.updated, true);
+
+// ---------- Rates strip ----------
+const tape = [
+  ["Fed funds target", num(DATA.fed.lo) ? f(DATA.fed.lo) + "–" + f(DATA.fed.hi) : "n/a", "EFFR " + f(DATA.fed.effr) + "% · " + dLabel(DATA.fed.date), DATA.fed.date],
+  ["2Y Treasury", f(y2), "Par yield · " + dLabel(yDate) + (num(y2p) ? " · " + bp(y2 - y2p) : ""), yDate],
+  ["10Y Treasury", f(y10), "Par yield · " + dLabel(yDate) + (num(y10p) ? " · " + bp(y10 - y10p) : ""), yDate],
+  ["30Y Treasury", f(y30), "Par yield · " + dLabel(yDate), yDate],
+  ["10Y real (TIPS)", f(real), "Par real yield · " + dLabel(sDate), sDate],
+  ["10Y breakeven", f(be), "Par minus real · " + dLabel(sDate), sDate],
+  ["HY credit spread", f(hy), "ICE BofA OAS, via FRED · " + dLabel(hyDate), hyDate],
+  ["30Y mortgage", f(mort), "Freddie Mac · week of " + dLabel(mortDate), mortDate],
+  ["WTI crude", num(DATA.wti.v) ? "$" + f(DATA.wti.v) : "n/a", "EIA Cushing spot · " + dLabel(DATA.wti.date), DATA.wti.date],
+  ["Forward P/E", f(V.pe, 1), "FactSet, S&P 500 · " + dLabel(V.report), V.report]
+];
+$("tape").innerHTML = tape.map(([k, v, d, dt]) => {
+  const old = dt && DATA.updated && daysBetween(dt, DATA.updated) > 10;
+  return `<div class="stat${old ? " stale" : ""}"><span class="k">${esc(k)}</span><span class="v">${esc(v)}</span><span class="d${old ? " warnd" : ""}">${esc(d)}${old ? " · not updated" : ""}</span></div>`;
+}).join("");
+
+// ---------- Regime tiles ----------
+const tiles = [];
+{
+  const [st, lab] = stDriver();
+  tiles.push({ t: "What's driving the 10Y?", st, lab, v: bp(dReal), small: "real yield since " + dLabel(S.dates[0]),
+    d: `From ${dLabel(S.dates[0])} to ${dLabel(sDate)} the real yield moved ${bp(dReal)} (${f(S.real[0])}% to ${f(real)}%) and the breakeven ${bp(dBe)} (${f(S.be[0])}% to ${f(be)}%).`,
+    rule: "Both falling = Easing (green). Otherwise the larger move decides: real yield = Growth-led (green), breakeven = Inflation-led (orange).",
+    x: "The 10-year Treasury yield splits into two parts: the real yield on 10-year TIPS (inflation-protected Treasuries) and the breakeven, the gap between the ordinary and TIPS yields, which roughly measures the inflation investors expect over ten years. When the real yield does most of a move, markets are repricing growth, the Fed's path or the extra pay demanded for holding long bonds. When the breakeven does most of it, inflation worries are the driver. The split is approximate: breakevens also carry risk and liquidity premiums, so in market stress they can move for reasons other than inflation expectations." });
+}
+{
+  const [st, lab] = stCurve();
+  tiles.push({ t: "Curve shape (10Y − 2Y)", st, lab, v: sgn(curve), small: "pts",
+    d: `10Y ${f(y10)}% minus 2Y ${f(y2)}% on ${dLabel(yDate)}` + (num(curveP) ? `, ${bp(curve - curveP)} on the day.` : "."),
+    rule: "Above 0 = Not inverted (green); 0 to −0.25 = Flat (amber); below −0.25 = Inverted (red).",
+    x: "The 10-year Treasury yield minus the 2-year. The 2-year mostly tracks where markets expect the Fed's policy rate over the next two years; the 10-year also reflects longer-run growth, inflation and term premium. Normally the curve slopes up. When it inverts, markets expect rate cuts ahead, usually because they expect a slowdown. San Francisco Fed research (2018), which measured the curve as the 10-year minus the 1-year yield, found an inverted curve before every US recession from 1955 on, typically 6 to 24 months earlier, with one false positive in the mid-1960s. It is not infallible: the July 2022 to September 2024 inversion had not been followed by an NBER-dated recession as of October 2026, and recessions have often started after the curve turned positive again." });
+}
+{
+  const [st, lab] = stHY();
+  tiles.push({ t: "High-yield credit spread", st, lab, v: f(hy), small: "%",
+    d: `${dLabel(hyDate)} close` + (num(hyPrev) ? `, ${bp(hy - hyPrev)} on the day` : "") + (num(hyChg5) ? ` and ${bp(hyChg5)} over five sessions` : "") + (num(hy) ? `. ${hy < 3.5 ? bp(3.5 - hy).replace("+", "") + " below" : bp(hy - 3.5).replace("+", "") + " above"} the 3.5% line.` : "."),
+    rule: "Below 3.00 and not up more than 25bp in five sessions = Calm; 3.00–3.50 or a fast widening = Watch; 3.50–5.00 = Stress; above 5.00 = Credit stress.",
+    x: "The extra yield junk-rated companies pay over Treasuries of the same maturity. It is mainly the market's price for default risk. Low and stable usually means lenders see little danger; a fast widening means they see more. Spreads began widening about four months before stocks peaked in 2007, but they do not lead reliably: in April 2025 they widened in the same days that stocks fell, and Reuters reported in November 2018 that high yield had lagged that sell-off. A widening confirms stress more reliably than it predicts it." });
+}
+{
+  const [st, lab] = stAuction();
+  tiles.push({ t: "Auction demand", st, lab, v: f(A.btc), small: "bid-to-cover",
+    d: `${esc(A.term)} on ${dLabel(A.date)}: high yield ${f(A.high, 3)}%` + (num(A.dealer) ? `, primary dealers took ${f(A.dealer, 1)}%` : ", dealer share not yet read") + (num(A.indirect) ? `, indirect bidders ${f(A.indirect, 1)}%.` : "."),
+    rule: "Bid-to-cover of at least 2.4 and dealer share of 20% or less = Solid; otherwise Soft.",
+    x: "When Treasury sells new debt, bid-to-cover is the amount bid divided by the amount sold, and the dealer share is how much the primary dealers had to take because other buyers did not. A low bid-to-cover or a high dealer share means weak demand. Weak auctions can push long-term yields up even without news on the economy, and they matter more when Treasury has a lot of debt to sell. One auction is a noisy signal. Traders also watch the \"tail\" against the pre-auction market yield, but that market yield is not published by Treasury, so this page does not show it." });
+}
+{
+  const [st, lab] = stGap(gap);
+  tiles.push({ t: "Equity yield gap", st, lab, v: sgn(gap), small: "pts",
+    d: `Forward earnings yield ${f(ey)}% (100 ÷ FactSet's ${f(V.pe, 1)} forward P/E, ${dLabel(V.report)}) minus the ${f(y10)}% 10Y (${dLabel(yDate)}).`,
+    rule: "1.5 pts or more = Cushion; 0.5 to 1.5 = Thin; below 0.5 = No cushion.",
+    x: "The S&P 500's forward earnings yield (next-12-month earnings ÷ price, the inverse of the P/E) minus the 10-year Treasury yield. It shows how much extra yield stocks offer over Treasuries. Near zero, Treasuries offer a similar yield without equity risk, though the two are not like for like: earnings can grow and a bond's coupon cannot. It is not a timing signal: the gap was negative in the late 1990s while stocks kept rising." });
+}
+const tileHTML = o => `<div class="tile sig st-${o.st}"><div class="label">${esc(o.t)}</div><span class="st"><i></i>${esc(o.lab)}</span>
+  <div class="value${o.txt ? " txt" : ""}">${esc(o.v)}<small>${esc(o.small || "")}</small></div>
+  <div class="desc">${o.d}</div><div class="rule">${esc(o.rule)}</div>
+  <details><summary>What it is</summary><p>${esc(o.x)}</p></details></div>`;
+$("sig").innerHTML = tiles.map(tileHTML).join("");
+
+// ---------- Current read (numbers only, generated) ----------
+const cnt = { good: 0, warn: 0, bad: 0 };
+tiles.forEach(t => t.st === "good" ? cnt.good++ : t.st === "warn" ? cnt.warn++ : (t.st === "serious" || t.st === "crit") ? cnt.bad++ : 0);
+$("read").innerHTML = `<div class="eyebrow">Current read · automatic summary</div>
+<h2>10Y ${f(y10)}%${num(y10p) ? ` (${bp(y10 - y10p)} on the day)` : ""}, curve ${sgn(curve)} pts, HY spread ${f(hy)}%, equity gap ${sgn(gap)} pts. ${cnt.good} green, ${cnt.warn} amber, ${cnt.bad} orange or red signals.</h2>
+<div class="cols">
+ <div><h3>Fed &amp; rates</h3><p>Fed funds target ${f(DATA.fed.lo)}–${f(DATA.fed.hi)}%. 2Y ${f(y2)}%, 10Y ${f(y10)}%, 30Y ${f(y30)}% (${dLabel(yDate)}). The 2Y sits ${bp(y2 - (DATA.fed.lo + DATA.fed.hi) / 2).replace("+", "")} ${y2 >= (DATA.fed.lo + DATA.fed.hi) / 2 ? "above" : "below"} the middle of the target range, a rough gauge of where markets expect policy to go.</p></div>
+ <div><h3>Credit &amp; valuation</h3><p>HY spread ${f(hy)}% (${dLabel(hyDate)}), ${num(hyChg5) ? bp(hyChg5) + " over five sessions" : "five-session change not known"}. Forward P/E ${f(V.pe, 1)} (${dLabel(V.report)}), an earnings yield of ${f(ey)}%.</p></div>
+ <div><h3>Inflation pricing</h3><p>10Y real yield ${f(real)}% and breakeven ${f(be)}% (${dLabel(sDate)}). Since ${dLabel(S.dates[0])}: real ${bp(dReal)}, breakeven ${bp(dBe)}.</p></div>
+</div>
+<div class="auto">Written by the page from the data blocks; no causes or forecasts. Hand-written context is under Notes.</div>`;
+
+// ---------- Regime commentary (generated) ----------
+$("sigComm").innerHTML = [
+  ["Distances to the lines", `HY spread: ${num(hy) ? (hy < 3.5 ? bp(3.5 - hy).replace("+", "") + " below 3.5%" : bp(hy - 3.5).replace("+", "") + " above 3.5%") : "n/a"}. Curve: ${num(curve) ? (curve > 0 ? bp(curve).replace("+", "") + " above inversion" : bp(-curve).replace("+", "") + " inverted") : "n/a"}. Equity gap: ${num(gap) ? (gap < 0.5 ? bp(0.5 - gap).replace("+", "") + " below the 0.5-pt line" : bp(gap - 0.5).replace("+", "") + " above the 0.5-pt line") : "n/a"}.`],
+  ["What would change the read", "Breakevens rising while real yields fall would point to an inflation scare. Real yields rising while jobs data weakens would point to supply and term premium rather than growth. A flattening or inverting curve would point to tightening into a slowdown. HY spreads holding above about 3.5% would point to credit stress."],
+  ["What the tiles cannot show", "Causes. The page reports levels and changes; why a number moved is in the dated notes, when someone has written one."]
+].map(([h, p], i) => `<div><h3>${h}</h3><p${i === 0 ? ' class="auto"' : ""}>${p}</p></div>`).join("");
+
+// ---------- Charts ----------
+function lineChart(el, cfg) {
+  const W = 520, H = 220, m = { t: 14, r: 46, b: 28, l: 40 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b, n = cfg.x.length;
+  const [y0, y1] = cfg.domain;
+  const X = i => m.l + (n === 1 ? iw / 2 : i * iw / (n - 1));
+  const Y = v => m.t + ih - (v - y0) / (y1 - y0) * ih;
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(cfg.aria)}"><g class="grid">`;
+  cfg.ticks.forEach(t => { s += `<line x1="${m.l}" x2="${W - m.r}" y1="${Y(t)}" y2="${Y(t)}"/><text x="${m.l - 6}" y="${Y(t) + 3.5}" text-anchor="end">${t.toFixed(cfg.tdp ?? cfg.dp)}</text>`; });
+  s += `</g>`;
+  (cfg.ref || []).forEach(r => { s += `<line x1="${m.l}" x2="${W - m.r}" y1="${Y(r.v)}" y2="${Y(r.v)}" stroke="var(--faint)" stroke-dasharray="4 4"/><text x="${W - m.r + 4}" y="${Y(r.v) + 3.5}">${r.label}</text>`; });
+  if (cfg.zero) s += `<line x1="${m.l}" x2="${W - m.r}" y1="${Y(0)}" y2="${Y(0)}" stroke="var(--muted)"/>`;
+  const every = cfg.xEvery || 1;
+  cfg.x.forEach((lab, i) => { if (i % every === 0 || i === n - 1) s += `<text x="${X(i)}" y="${H - 8}" text-anchor="middle">${esc(lab)}</text>`; });
+  cfg.series.forEach(se => {
+    const pts = se.v.map((v, i) => num(v) ? `${X(i)},${Y(v)}` : null).filter(Boolean).join(" ");
+    if (cfg.series.length === 1) { const b = cfg.base ?? y0; s += `<polygon points="${X(0)},${Y(b)} ${pts} ${X(n - 1)},${Y(b)}" fill="${se.c}" fill-opacity=".10"/>`; }
+    s += `<polyline points="${pts}" fill="none" stroke="${se.c}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    const lv = se.v[n - 1];
+    if (num(lv)) s += `<circle cx="${X(n - 1)}" cy="${Y(lv)}" r="4.5" fill="${se.c}" stroke="var(--card)" stroke-width="2"/><text class="vlab" x="${X(n - 1) + 8}" y="${Y(lv) + 3.5}" style="fill:var(--fg)">${lv.toFixed(cfg.dp)}</text>`;
+  });
+  s += `<line class="xh" x1="0" x2="0" y1="${m.t}" y2="${m.t + ih}" stroke="var(--faint)" opacity="0"/><rect x="${m.l}" y="${m.t}" width="${iw}" height="${ih}" fill="transparent"/></svg><div class="tip"></div>`;
+  el.innerHTML = s;
+  const svg = el.querySelector("svg"), tip = el.querySelector(".tip"), xh = el.querySelector(".xh");
+  function show(ev) {
+    const r = svg.getBoundingClientRect(), px = (ev.clientX - r.left) * W / r.width;
+    let i = Math.round((px - m.l) / (iw / Math.max(n - 1, 1))); i = Math.max(0, Math.min(n - 1, i));
+    xh.setAttribute("x1", X(i)); xh.setAttribute("x2", X(i)); xh.setAttribute("opacity", 1);
+    tip.innerHTML = `<div class="t">${esc(cfg.full ? cfg.full[i] : cfg.x[i])}</div>` + cfg.series.map(se => `<div class="r"><span><i class="swatch" style="background:${se.c}"></i>${esc(se.name)}</span><span>${num(se.v[i]) ? se.v[i].toFixed(cfg.dp) + cfg.unit : "n/a"}</span></div>`).join("");
+    tip.style.display = "block";
+    const left = Math.min(Math.max(X(i) * r.width / W - 90, 0), r.width - 180);
+    tip.style.left = left + "px"; tip.style.top = "4px";
+  }
+  svg.addEventListener("pointermove", show); svg.addEventListener("pointerdown", show);
+  svg.addEventListener("pointerleave", () => { tip.style.display = "none"; xh.setAttribute("opacity", 0); });
+}
+function dom(vals, step, pad = 0) {
+  const v = vals.filter(num); let lo = Math.floor((Math.min(...v) - pad) / step) * step, hi = Math.ceil((Math.max(...v) + pad) / step) * step;
+  if (hi === lo) hi = lo + step;
+  const ticks = []; for (let t = lo; t <= hi + 1e-9; t += step) ticks.push(+t.toFixed(4));
+  return { domain: [lo, hi], ticks };
+}
+// c1 real vs breakeven
+{
+  const d = dom(S.real.concat(S.be), 0.2, 0.05);
+  lineChart($("c1"), { aria: `10-year real yield and breakeven, ${dLabel(S.dates[0])} to ${dLabel(sDate)}`, x: S.dates.map(md), full: S.dates.map(s => dLabel(s, true)), xEvery: 2, ...d, dp: 2, unit: "%",
+    series: [{ name: "Real", c: "var(--pub)", v: S.real }, { name: "Breakeven", c: "var(--gov)", v: S.be }] });
+  $("c1note").textContent = `Daily, ${dLabel(S.dates[0])} to ${dLabel(sDate, true)}. Source: Treasury par and real yield curves; breakeven = 10Y par yield minus 10Y real par yield. Points before Oct 19, 2026 were read from FRED T10YIE, which matched that difference on the dates checked.`;
+}
+// c2 HY
+{
+  const pts = C.anchors.concat(C.daily);
+  const vals = pts.map(p => p[1]);
+  const d = dom(vals.concat([3.5]), 0.4, 0.1);
+  lineChart($("c2"), { aria: `High-yield spread, selected observations through ${dLabel(hyDate)}`, x: pts.map(p => md(p[0])), full: pts.map(p => dLabel(p[0], true)), ...d, dp: 2, unit: "%", ref: [{ v: 3.5, label: "3.5" }],
+    series: [{ name: "HY OAS", c: "var(--pub)", v: vals }] });
+  $("c2note").textContent = `ICE BofA US High Yield OAS, %, via FRED (${C.series}). Three earlier anchors, then the most recent daily closes, so the spacing is uneven. Latest ${dLabel(hyDate, true)}.`;
+}
+// c3 mortgage
+{
+  const mo = DATA.mortgage.monthly, wk = DATA.mortgage.weekly;
+  const x = mo.map(r => MON[+r[0].slice(5) - 1]).concat(wk.map(r => md(r[0])));
+  const full = mo.map(r => dLabel(r[0]) + " average").concat(wk.map(r => "Week of " + dLabel(r[0], true)));
+  const v = mo.map(r => r[1]).concat(wk.map(r => r[1]));
+  const d = dom(v, 0.4, 0.05);
+  lineChart($("c3"), { aria: "30-year mortgage rate, monthly averages then weekly", x, full, ...d, dp: 2, unit: "%", series: [{ name: "30Y fixed", c: "var(--pub)", v }] });
+  const gap10 = num(mort) && num(y10) ? mort - y10 : null;
+  $("c3note").textContent = `Freddie Mac PMMS, %. Monthly averages, then weekly prints. Latest ${f(mort)}% (week of ${dLabel(mortDate, true)}); a year earlier ${f(DATA.mortgage.yago)}%. Spread to the latest 10Y par yield: ${f(gap10)} pts.`;
+}
+// c4 unemployment
+{
+  const u = DATA.unrate;
+  const d = dom(u.v, 0.2, 0.1);
+  lineChart($("c4"), { aria: "Unemployment rate, last six months", x: u.months.map(s => MON[+s.slice(5) - 1]), full: u.months.map(s => dLabel(s)), ...d, dp: 1, tdp: 1, unit: "%", series: [{ name: "Unemployment", c: "var(--pub)", v: u.v }] });
+  const a3 = u.v.slice(-3).reduce((a, b) => a + b, 0) / 3;
+  $("c4note").textContent = `BLS, %, monthly. Latest ${f(last(u.v), 1)}% (${dLabel(last(u.months))}); 3-month average ${f(a3, 2)}%.`;
+}
+// c5 equity gap history (static) + now
+{
+  const x = HIST.gap.x.concat(["Now"]), v = HIST.gap.v.concat([gap]);
+  lineChart($("c5"), { aria: "Equity yield gap at year-ends since 1999 and now", x, full: HIST.gap.x.map(s => /^\d{4}$/.test(s) ? "End " + s : "Late June 2026").concat([`Now (${dLabel(yDate, true)})`]),
+    xEvery: 4, domain: [-3, 7], ticks: [-2, 0, 2, 4, 6], tdp: 0, dp: 2, unit: " pts", base: 0, zero: true, series: [{ name: "Gap", c: "var(--pub)", v }] });
+  $("c5note").textContent = `Percentage points. Year-end values 1999–2024 are approximate, reconstructed from year-end S&P 500 forward P/E (±~1 turn) and the 10Y yield; treat as ±0.3 pts. The late-June 2026 point uses FactSet's 20.4 forward P/E and a 4.38% 10Y. Now = 100 ÷ FactSet's forward P/E (${dLabel(V.report, true)}) minus the 10Y par yield (${dLabel(yDate, true)}).`;
+}
+// HY episode bars (static) + today
+{
+  const rows = HIST.hy.concat(num(hy) ? [["Today", dLabel(hyDate, true), String(Math.round(hy * 100)), Math.round(hy * 100), "n"]] : []);
+  const max = 2400;
+  $("hy-hist").innerHTML = rows.map(r => { const w = r[3] / max * 100, c = r[4] === "p" ? "var(--gov)" : "var(--pub)";
+    return `<div class="hb${r[4] === "n" ? " now" : ""}"><div class="nm">${esc(r[0])}<small>${esc(r[1])}</small></div><div class="track"><div class="med" style="left:${450 / max * 100}%"></div><div class="bar" style="width:${w}%;--c:${c}"></div><div class="val" style="${w > 80 ? `right:${100 - w + 1}%;color:var(--card)` : `left:calc(${w}% + 6px)`}">${esc(r[2])}</div></div></div>`; }).join("");
+}
+
+// ---------- Scorecard ----------
+const WHAT = {
+  mort: "Rate locks feed home sales with a lag of one to two months.",
+  starts: "Builders start fewer homes when financing costs and buyer demand fall.",
+  permits: "Permits lead starts by a month or two.",
+  gdp: "Overall growth. Strong growth with high yields points to a growth-led rise.",
+  fspdp: "Core private demand, excluding trade, inventories and government.",
+  bfi: "Business spending on structures, equipment and software.",
+  gdpnow: "A model nowcast, not a forecast by Fed staff. It moves with each data release.",
+  ip: "Factory, mining and utility output.",
+  nfp: "Hiring. The labor stage of tightening shows here.",
+  ur: "Rises when hiring slows faster than the labor force grows.",
+  ahe: "Pay growth. Compare with CPI for real pay.",
+  claims: "The fastest weekly read on layoffs.",
+  cpi: "Headline consumer inflation, including food and energy.",
+  core: "Consumer inflation excluding food and energy.",
+  ppi: "Prices received by producers; parts feed into PCE.",
+  pce: "The Fed's preferred inflation gauge; its target is 2%."
+};
+function fmtS(r, v) { if (!num(v)) return "n/a"; if (r.unit === "k") return (r.id === "nfp" ? (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(0) : v.toFixed(0)) + "k"; if (r.unit === "M") return v.toFixed(r.dp) + "M"; return v.toFixed(r.dp) + "%"; }
+{
+  let h = `<colgroup><col style="width:24%"><col style="width:14%"><col style="width:16%"><col style="width:10%"><col></colgroup><thead><tr><th>Indicator</th><th>Latest</th><th>Prior</th><th>Change</th><th class="what">What it shows</th></tr></thead><tbody>`;
+  let g = "";
+  SCORE.forEach(r => {
+    if (r.grp !== g) { g = r.grp; h += `<tr class="group"><td colspan="5">${esc(g)}</td></tr>`; }
+    const d = num(r.latest) && num(r.prior) ? r.latest - r.prior : null;
+    const arrow = !num(d) ? "n/a" : Math.abs(d) < 1e-9 ? "→ unchanged" : (d > 0 ? "▲ " : "▼ ") + (r.unit === "%" ? Math.abs(d).toFixed(r.dp) + " pt" : fmtS(r, Math.abs(d)).replace("+", ""));
+    const extra = r.id === "nfp" && num(r.avg3) ? `<br><span class="sub">3-mo avg ${r.avg3}k</span>` : r.note ? `<br><span class="sub">${esc(r.note)}</span>` : "";
+    h += `<tr><td>${esc(r.label)}<br><span class="sub">${esc(r.src)}</span></td><td class="num">${fmtS(r, r.latest)}<br><span class="sub">${dLabel(r.period)}</span>${extra}</td><td class="num">${fmtS(r, r.prior)}<br><span class="sub">${r.pperiod ? dLabel(r.pperiod) : ""}</span></td><td class="dir">${arrow}</td><td class="what">${esc(WHAT[r.id] || "")}</td></tr>`;
+  });
+  $("score").innerHTML = h + "</tbody>";
+}
+
+// ---------- Consumer tiles ----------
+{
+  const K = CONS, out = [];
+  const cv = K.ctrl.v, c0 = last(cv), c1 = cv.length > 1 ? cv[cv.length - 2] : null;
+  let cs = !num(c0) ? ["none", "Not known"] : (c0 < 0 && num(c1) && c1 < 0) ? ["crit", "Cracking"] : c0 < 0 ? ["serious", "Contracting"] : c0 >= 0.5 ? ["good", "Strong"] : ["warn", "Soft"];
+  out.push({ t: "Retail sales control group", st: cs[0], lab: cs[1], v: sgn(c0, 1), small: "% m/m, " + dLabel(last(K.ctrl.months)),
+    d: "Retail and food services excluding autos, gasoline stations, building materials and food services, computed from Census advance retail sales." + (num(c1) ? ` Prior month ${sgn(c1, 1)}%.` : ""),
+    rule: "0.5% or more = Strong; 0 to 0.5% = Soft; negative = Contracting; two negative months in a row = Cracking.",
+    x: "Analysts compute the control group from the Census report; it is not an official Census series. It tracks the goods spending that feeds into GDP." });
+  const sr = K.save.rate, s0 = last(sr), rp = last(K.save.realpce);
+  let ss;
+  if (!num(s0)) ss = ["none", "Not known"];
+  else if (num(rp) && rp < 0) ss = ["serious", "Pulling back"];
+  else if (sr.length >= 4 && s0 - sr[sr.length - 4] >= 1) ss = ["serious", "Bracing"];
+  else if (s0 > 5 && num(rp) && rp > 0) ss = ["good", "Cushion"];
+  else if (s0 <= 3.5) ss = ["warn", "Thin buffer"];
+  else ss = ["warn", "Thin buffer"];
+  out.push({ t: "Real spending & saving rate", st: ss[0], lab: ss[1], v: f(s0, 1), small: "% saving rate, " + dLabel(last(K.save.months)),
+    d: `Real consumer spending ${num(rp) ? sgn(rp, 1) + "%" : "n/a"} on the month.` + (sr.length > 1 ? ` Saving rate ${f(sr[sr.length - 2], 1)}% the month before.` : ""),
+    rule: "Real spending negative = Pulling back; saving rate up 1 pt or more in 3 months = Bracing; above 5% with spending up = Cushion; otherwise Thin buffer.",
+    x: "The share of after-tax income households do not spend (BEA). A low rate means spending runs close to income, leaving little buffer. A sudden jump can signal people bracing for trouble, though one-off income can cause one too." });
+  const u = K.umich;
+  const us = !num(u.ics) ? ["none", "Not known"] : u.ics < 55 ? ["serious", "Gloomy"] : u.ics <= 70 ? ["warn", "Weak"] : ["good", "Healthy"];
+  out.push({ t: "Consumer sentiment (UMich)", st: us[0], lab: us[1], v: f(u.ics, 1), small: "final, " + dLabel(u.month),
+    d: `Year-ahead inflation expectations ${f(u.px1, 1)}%. Final monthly readings only; the preliminary reading is published as text on the survey's site, not in its data file.`,
+    rule: "Below 55 = Gloomy; 55 to 70 = Weak; above 70 = Healthy.",
+    x: "A monthly survey of how households feel about their finances and the economy. It measures mood, not spending, and the two can diverge for long stretches." });
+  const k = K.card;
+  const dy = num(k.flow90) && num(k.yago) ? k.flow90 - k.yago : null;
+  const ks = !num(k.flow90) ? ["none", "Not known"] : k.flow90 > 7.5 ? ["crit", "Stress"] : (num(dy) && dy >= 0.5) ? ["serious", "Rising"] : ["warn", "Elevated, stable"];
+  out.push({ t: "Credit card stress", st: ks[0], lab: ks[1], v: f(k.flow90, 2), small: "% flow to 90+ days, " + dLabel(k.q),
+    d: `${f(k.yago, 2)}% a year earlier (${sgn(dy, 2)} pts). Card balances $${f(k.bal / 1000, 3)}T.`,
+    rule: "Above about 7.5% = Stress; up 0.5 pt or more on the year = Rising; otherwise Elevated, stable.",
+    x: "The share of card balances newly becoming 90+ days late, summed over four quarters (NY Fed). It shows whether households that borrowed to keep spending are starting to fall behind." });
+  $("cons").innerHTML = out.map(tileHTML).join("");
+  const claims = SCORE.find(r => r.id === "claims");
+  $("consComm").innerHTML = `<div><h3>Layoff watch</h3><p class="auto">Initial jobless claims ${fmtS(claims, claims.latest)} in the week to ${dLabel(claims.period)}, ${num(claims.latest) ? (claims.latest > 275 ? "above" : "below") : "n/a"} the 275k line this page uses as a layoff warning.</p></div>
+  <div><h3>Say vs. do</h3><p>Sentiment and spending can diverge for long stretches. Mood is a weak guide to spending until jobs start to go.</p></div>
+  <div><h3>What would signal a crack</h3><p>Two straight negative control-group months, real spending falling, a jump in the saving rate, card delinquencies above about 7.5%, or claims breaking above 275k.</p></div>`;
+}
+
+// ---------- Calculator ----------
+const CD = { y10: y10, spx: Math.round(V.price), eps: num(eps) ? Math.round(eps * 2) / 2 : 400, ry: real };
+$("calcSub").textContent = `How much stocks pay over bonds at a given 10Y and index level. Defaults: 10Y par yield ${dLabel(yDate, true)}; index level and forward EPS from FactSet's ${dLabel(V.report, true)} report (EPS = price ÷ forward P/E); real yield ${dLabel(sDate, true)}.`;
+function calc() {
+  const y = +$("y10").value, p = +$("spx").value, e = +$("eps").value, r = +$("ry").value;
+  $("y10o").textContent = y.toFixed(2) + "%"; $("spxo").textContent = p.toLocaleString("en-US");
+  $("epso").textContent = "$" + e.toFixed(2); $("ryo").textContent = r.toFixed(2) + "%";
+  const eyv = e / p * 100, gN = eyv - y, gR = eyv - r;
+  $("pe").textContent = (p / e).toFixed(1) + "×"; $("ey").textContent = eyv.toFixed(2) + "%";
+  $("gapN").textContent = sgn(gN) + " pts"; $("gapN").style.color = gN < 0.5 ? "var(--bad)" : gN < 1.5 ? "var(--s4)" : "var(--good)";
+  $("gapR").textContent = sgn(gR) + " pts";
+  $("lvl1").textContent = Math.round(e / ((y + 1) / 100)).toLocaleString("en-US");
+  const w = Math.min(Math.abs(gN), 3) / 3 * 50, bar = $("gapBar");
+  bar.style.width = w + "%"; bar.style.left = (gN >= 0 ? 50 : 50 - w) + "%";
+  bar.style.background = gN < 0.5 ? "var(--bad)" : gN < 1.5 ? "var(--s4)" : "var(--good)";
+}
+function resetCalc() { Object.entries(CD).forEach(([k, v]) => { if (num(v)) $(k).value = v; }); calc(); }
+["y10", "spx", "eps", "ry"].forEach(id => $(id).addEventListener("input", calc));
+$("reset").addEventListener("click", resetCalc);
+resetCalc();
+{
+  const eyv = num(eps) ? eps / V.price * 100 : null;
+  const drop = num(eyv) ? (1 - eyv / (eyv + 0.25)) * 100 : null;
+  $("calcComm").innerHTML = `<div><h3>Rule of thumb</h3><p class="auto">At the defaults, each 0.25-pt rise in the 10Y takes about ${f(drop, 1)}% off the index if investors demand the same gap.</p></div>
+  <div><h3>What offsets it</h3><p>Rising earnings. If forward EPS grows fast enough, the earnings yield rises without prices falling. Move the EPS slider to see how much growth covers a given rate increase.</p></div>
+  <div><h3>Nominal vs. real</h3><p class="auto">Against the real 10Y the gap is ${num(eyv) && num(real) ? sgn(eyv - real) : "n/a"} pts. Both views are shown; the nominal one is the common market yardstick.</p></div>`;
+}
+
+// ---------- Next releases ----------
+{
+  const LAST = {
+    starts: () => { const r = SCORE.find(x => x.id === "starts"); return `Last: ${fmtS(r, r.latest)} (${dLabel(r.period)}).`; },
+    claims: () => { const r = SCORE.find(x => x.id === "claims"); return `Last: ${fmtS(r, r.latest)} (week to ${dLabel(r.period)}).`; },
+    mort: () => `Last: ${f(mort)}% (week of ${dLabel(mortDate)}).`,
+    umich: () => `Last final reading: ${f(CONS.umich.ics, 1)} (${dLabel(CONS.umich.month)}).`,
+    auction: () => `Last coupon auction: ${A.term}, bid-to-cover ${f(A.btc)} (${dLabel(A.date)}).`,
+    gdp: () => { const r = SCORE.find(x => x.id === "gdp"); return `Last: ${fmtS(r, r.latest)} (${dLabel(r.period)}).`; },
+    pce: () => { const r = SCORE.find(x => x.id === "pce"); return `Last core PCE: ${fmtS(r, r.latest)} y/y (${dLabel(r.period)}).`; },
+    fomc: () => `Target range now ${f(DATA.fed.lo)}–${f(DATA.fed.hi)}%.`,
+    nhs: () => ""
+  };
+  const today = new Date().toISOString().slice(0, 10);
+  const ref = today > DATA.updated ? today : DATA.updated;
+  const rows = CAL.filter(c => c.d > ref || (c.d === ref)).slice(0, 8);
+  const dow = s => ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][new Date(s + "T12:00:00Z").getUTCDay()];
+  $("cal").innerHTML = rows.length ? rows.map(c => `<div><span class="when">${dow(c.d)} ${dLabel(c.d)} · ${esc(c.t)} ET</span><span class="ev">${esc(c.ev)}</span><span class="why">${esc(c.src)}. ${esc((LAST[c.id] || (() => ""))())}</span></div>`).join("")
+    : `<div><span class="why">No scheduled releases are loaded for the coming days. The update script refreshes this list.</span></div>`;
+}
+
+// ---------- Notes (hand-written, dated) ----------
+{
+  const ns = NOTES.slice().sort((a, b) => a.date < b.date ? 1 : -1);
+  $("notes").innerHTML = ns.length ? ns.map(n => { const age = daysBetween(n.date, DATA.updated);
+    return `<div class="n"><div class="eyebrow">${dLabel(n.date, true)}${age > 14 ? ` · <span class="old">${age} days old</span>` : ""}</div><h3 style="font-size:14px;margin-top:2px">${esc(n.title)}</h3><p>${esc(n.text)}</p></div>`; }).join("")
+    : `<p class="sub">No notes yet.</p>`;
+}
+
+// ---------- Data check log ----------
+$("log").innerHTML = `<colgroup><col style="width:22%"><col style="width:12%"><col style="width:12%"><col style="width:20%"><col style="width:8%"><col></colgroup><thead><tr><th>Indicator</th><th>Value</th><th>Data date</th><th>Source</th><th>Checked</th><th>Result</th></tr></thead><tbody>` +
+  LOG.map(r => `<tr>${r.map(c => `<td>${esc(c)}</td>`).join("")}</tr>`).join("") + "</tbody>";
+$("foot-note").textContent = `Data blocks last written ${dLabel(DATA.updated, true)}.`;
+
+</script>
+</body>
+</html>

@@ -13,7 +13,10 @@ from conftest import ROOT, TODAY
 import update as u
 from sources import common
 
-PAGE = (ROOT / "index.html").read_text(encoding="utf-8")
+# Value tests use the seed page as merged (frozen in fixtures): the live index.html changes with every
+# data commit, so tests that read seed values from it broke after the first published update.
+PAGE = (ROOT / "tests" / "fixtures" / "index_seed.html").read_text(encoding="utf-8")
+LIVE = (ROOT / "index.html").read_text(encoding="utf-8")
 
 
 def blocks():
@@ -103,10 +106,10 @@ def test_check6_shapes():
 
 # --- summary.json: the page's tile rules, ported -------------------------------
 
-def page_tiles_in_node():
-    """Run the page's own derived values and status functions in Node on the seed blocks."""
-    script = u.extract_script(PAGE)
-    lines = PAGE.splitlines(keepends=True)
+def page_tiles_in_node(html=PAGE):
+    """Run the page's own derived values and status functions in Node on the page's blocks."""
+    script = u.extract_script(html)
+    lines = html.splitlines(keepends=True)
     idx = u.block_lines(lines)
     data = "".join(lines[idx[n]] for n in u.BLOCK_NAMES)
     helpers = "\n".join(l for l in script.splitlines() if l.startswith(("const num =", "const last =")))
@@ -471,4 +474,81 @@ def test_run_writes_one_report_to_the_job_summary(tmp_path, offline, monkeypatch
 def test_contact_not_set_message(tmp_path, offline, capsys):
     run(tmp_path, dry_run=True, keys={})
     assert ("- Contact User-Agent for BLS and DOL: not set (CONTACT_EMAIL empty; the workflow fills it "
-            "from the COMMIT_EMAIL variable).") in capsys.readouterr().out
+            "from the CONTACT_EMAIL secret).") in capsys.readouterr().out
+
+
+# --- Census housing by region, diagnostics, contact secret --------------------------------------
+
+def _resconst_with_regions():
+    """The doc sample plus geo_level_code / time_slot_name columns and regional ASTARTS rows."""
+    from conftest import text as fx
+    rows = json.loads(fx("census_eits_doc_sample_resconst.json"))
+    h = rows[0] + ["geo_level_code", "time_slot_name"]
+    out = [h] + [r + ["US", "Not applicable"] for r in rows[1:]]
+    for t, v in (("2026-07", 225), ("2026-08", 220)):
+        out.append([str(v), "TOTAL", "0", "no", "ASTARTS", "yes", t, "MW", "Not applicable"])
+    return out
+
+
+def test_housing_uses_us_rows_when_regions_are_returned():
+    from sources import census
+    data = census.parse_eits(json.dumps(_resconst_with_regions()), "resconst")
+    h = census.compute_housing(data)
+    assert (h["starts"]["latest"], h["starts"]["prior"], h["permits"]["latest"]) == (1.275, 1.3, 1.403)
+
+
+def test_housing_range_failure_prints_every_combination(tmp_path, offline, capsys):
+    rows = _resconst_with_regions()
+    for r in rows[1:]:  # the US July value is what run #4 saw
+        if r[4] == "ASTARTS" and r[6] == "2026-07" and r[7] == "US" and r[5] == "yes":
+            r[0] = "225"
+    from sources import census
+    offline["resconst"] = lambda: census.parse_eits(json.dumps(rows), "resconst")
+    rc, new = run(tmp_path, dry_run=True)
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "### Census housing: ASTARTS and APERMITS, last 6 months (range check failed)" in out
+    assert "- EITS returns no unit field" in out
+    assert "- ASTARTS/TOTAL/yes geo MW time_slot_id 0 (Not applicable): 2026-07 225, 2026-08 220" in out
+    assert "- ASTARTS/TOTAL/yes geo US time_slot_id 0 (Not applicable): 2026-07 225, 2026-08 1275" in out
+    assert "- APERMITS/TOTAL/yes geo US time_slot_id 0 (Not applicable): 2026-07 1400, 2026-08 1403" in out
+    row = next(r for r in u.load_page(new)["LOG"] if r[0] == "Housing starts / permits")
+    assert u.SEED_MARK in row[5]  # not compared: the seed check still runs later
+
+
+def test_census_query_requests_region_and_slot_name():
+    from conftest import text as fx
+    from sources import census
+    q = census.URL_EITS.split("get=")[1].split("&")[0].split(",")
+    known = json.loads(fx("census_eits_resconst_variables.json"))["variables"]
+    assert {"geo_level_code", "time_slot_name"} <= set(q) and all(v in known for v in q)
+
+
+def test_workflow_takes_contact_from_the_secret():
+    wf = (ROOT / ".github" / "workflows" / "update.yml").read_text(encoding="utf-8")
+    assert "CONTACT_EMAIL: ${{ secrets.CONTACT_EMAIL }}" in wf and "CONTACT_EMAIL: ${{ vars." not in wf
+    assert "COMMIT_EMAIL: ${{ vars.COMMIT_EMAIL }}" in wf  # the Commit step keeps the variable
+
+
+# --- the live page (whatever the last data commit wrote) -----------------------------------------
+
+def test_live_page_round_trips_and_passes_page_checks():
+    b = u.load_page(LIVE)
+    assert u.render_page(LIVE, b) == LIVE
+    u.verify_page(LIVE, u.render_page(LIVE, b), b)
+    u.check_shapes(b)
+
+
+def test_live_page_keeps_the_fixed_parts_of_the_seed():
+    """Outside the five script-written lines, the live page must equal the seed page byte for byte."""
+    live, seed = LIVE.splitlines(keepends=True), PAGE.splitlines(keepends=True)
+    il, iseed = u.block_lines(live), u.block_lines(seed)
+    skip = {il[n] for n in u.WRITTEN}
+    assert il == iseed and len(live) == len(seed)
+    assert [l for i, l in enumerate(live) if i not in skip] == [l for i, l in enumerate(seed) if i not in skip]
+    assert re.search(r'</header>\s*<p class="disclaimer"><b>For education only\. Not financial advice\.</b>', LIVE)
+
+
+def test_live_summary_tiles_match_page_rules():
+    t, _ = u.tiles(u.load_page(LIVE)["DATA"])
+    assert [[x["status"], x["label"]] for x in t] == page_tiles_in_node(LIVE)

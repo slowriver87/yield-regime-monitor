@@ -215,6 +215,7 @@ class Run:
     new_sources: set = field(default_factory=set)   # sources with a new data date this run
     trading_days: set | None = None                 # dates in the Treasury par yield file
     census_codes: dict = field(default_factory=dict)  # dataset -> code combinations, for the summary
+    housing_diag: list = field(default_factory=list)  # starts/permits breakdown when the range check fails
 
     def __post_init__(self):
         self.new = copy.deepcopy(self.old)
@@ -800,6 +801,8 @@ def do_census(run: Run, cal: list[dict] | None):
                       " / ".join("n/a" if h[k]["latest"] is None else f"{h[k]['latest']:.3f}M" for k in ("starts", "permits")),
                       period_label(per), new_result(per, "Single source.") if (f1 or f2) else "No new release.")
     except SourceError as e:
+        if isinstance(e, census.HousingRangeError):
+            run.housing_diag = e.diagnostics
         if "not found" in str(e) or "outside" in str(e) or "values for" in str(e):
             run.layouts.append(str(e))
         run.not_reached("housing", e, "Census")
@@ -1232,7 +1235,7 @@ def run_update(page: Path, summary_path: Path, dry_run: bool, commit_msg: Path |
     if keys.get("CONTACT_EMAIL") and os.environ.get("GITHUB_ACTIONS") == "true":
         print(f"::add-mask::{keys['CONTACT_EMAIL']}")  # masks any later appearance in the job log
     say("- Contact User-Agent for BLS and DOL: " + ("set." if keys.get("CONTACT_EMAIL") else
-        "not set (CONTACT_EMAIL empty; the workflow fills it from the COMMIT_EMAIL variable)."))
+        "not set (CONTACT_EMAIL empty; the workflow fills it from the CONTACT_EMAIL secret)."))
     run = None
     try:
         html = page.read_text(encoding="utf-8")
@@ -1294,6 +1297,9 @@ def run_update(page: Path, summary_path: Path, dry_run: bool, commit_msg: Path |
         say("\n### Census EITS code combinations (category/data type/seasonally adjusted)\n")
         for ds, codes in run.census_codes.items():
             say(f"- {ds} ({len(codes)}): {', '.join(codes)}")
+    if run.housing_diag:
+        say("\n### Census housing: ASTARTS and APERMITS, last 6 months (range check failed)\n")
+        say("\n".join(f"- {l}" for l in run.housing_diag))
     if run.layouts:
         say("\n### Layouts to map (a parser could not find its fields)\n")
         say("\n".join(f"- {l}" for l in run.layouts))
