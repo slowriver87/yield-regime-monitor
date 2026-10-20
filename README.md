@@ -61,7 +61,8 @@ python scripts/update.py --dry-run
 ### Repository settings
 
 - Secrets: `BLS_API_KEY`, `BEA_API_KEY`, `CENSUS_API_KEY`, `FRED_API_KEY`, `EIA_API_KEY`.
-- Variables: `COMMIT_NAME`, `COMMIT_EMAIL` (the GitHub no-reply address). `COMMIT_EMAIL` is also sent, at run time only, as the contact in the User-Agent for BLS and the Department of Labor, which block anonymous automated clients.
+- Variables: `COMMIT_NAME`, `COMMIT_EMAIL` (the GitHub no-reply address) for the commit author.
+- Secret `CONTACT_EMAIL`: the contact address sent, at run time only, in the User-Agent for BLS and the Department of Labor, which block anonymous automated clients. It is a secret so that GitHub masks it in the job log.
 - Pages: deploy from the default branch, root folder.
 
 ## Not automated

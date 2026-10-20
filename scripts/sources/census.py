@@ -13,8 +13,10 @@ import re
 
 from .common import MONTH_NAME, SourceError, cell_text, fetch, month_add, parse_time_label
 
+# geo_level_code and time_slot_name are listed in the dataset's variables.json (fixture
+# census_eits_resconst_variables.json); without geo_level_code, regional rows were indistinguishable
 URL_EITS = ("https://api.census.gov/data/timeseries/eits/{ds}?get=cell_value,data_type_code,time_slot_id,"
-            "error_data,category_code,seasonally_adj&time=from+{y}&key={k}")
+            "time_slot_name,geo_level_code,error_data,category_code,seasonally_adj&time=from+{y}&key={k}")
 URL_CAL = "https://www.census.gov/economic-indicators/calendar-listview-{y}.html"
 
 # (category_code, data_type_code, seasonally_adj)
@@ -35,11 +37,18 @@ CAL_EVENTS = {
 }
 
 
-def parse_eits(text: str, ds: str) -> dict[tuple, dict[str, dict[str, float]]]:
-    """Array of arrays with a header row ->
-    {(category, data type, seasonally_adj): {YYYY-MM: {time_slot_id: value}}}.
-    Rows with error_data 'yes' (margins of error) are skipped. Several values for one month are kept
-    here; only a series the page uses must have one value per month (see `_need`)."""
+class Eits(dict):
+    """{(category, data type, seasonally_adj): {YYYY-MM: {(geo_level_code, time_slot_id): value}}}.
+    `slot_names` maps time_slot_id -> time_slot_name; `has_geo` is True when the response carries
+    geo_level_code (then only the US rows feed the page)."""
+    slot_names: dict
+    has_geo: bool
+
+
+def parse_eits(text: str, ds: str) -> Eits:
+    """Array of arrays with a header row. Rows with error_data 'yes' (margins of error) are skipped.
+    Several values for one month are kept here; only a series the page uses must have one US value
+    per month (see `_need`)."""
     try:
         rows = json.loads(text)
     except ValueError:
@@ -51,8 +60,9 @@ def parse_eits(text: str, ds: str) -> dict[tuple, dict[str, dict[str, float]]]:
     if any(n not in h for n in need):
         raise SourceError(f"Census EITS {ds}: unexpected header {h}")
     ix = {n: h.index(n) for n in need}
-    slot = h.index("time_slot_id") if "time_slot_id" in h else None
-    out: dict[tuple, dict[str, dict[str, float]]] = {}
+    opt = {n: h.index(n) if n in h else None for n in ("time_slot_id", "geo_level_code", "time_slot_name")}
+    out = Eits()
+    out.slot_names, out.has_geo = {}, opt["geo_level_code"] is not None
     for r in rows[1:]:
         if str(r[ix["error_data"]]).lower() != "no":
             continue
@@ -63,8 +73,11 @@ def parse_eits(text: str, ds: str) -> dict[tuple, dict[str, dict[str, float]]]:
         except (TypeError, ValueError):
             continue
         key = (r[ix["category_code"]], r[ix["data_type_code"]], str(r[ix["seasonally_adj"]]).lower())
-        sid = str(r[slot]) if slot is not None else ""
-        out.setdefault(key, {}).setdefault(r[ix["time"]], {})[sid] = v
+        sid = str(r[opt["time_slot_id"]]) if opt["time_slot_id"] is not None else ""
+        geo = str(r[opt["geo_level_code"]]) if out.has_geo else ""
+        if opt["time_slot_name"] is not None:
+            out.slot_names.setdefault(sid, str(r[opt["time_slot_name"]]))
+        out.setdefault(key, {}).setdefault(r[ix["time"]], {})[(geo, sid)] = v
     if not out:
         raise SourceError(f"Census EITS {ds}: no data rows")
     return out
@@ -75,18 +88,54 @@ def combinations(data: dict) -> list[str]:
     return sorted(f"{c}/{d}/{s}" for c, d, s in data)
 
 
-def _need(data: dict, key: tuple, ds: str) -> dict[str, float]:
-    """{YYYY-MM: value} for a series the page uses; it must have one value per month."""
+def _where(geo: str, sid: str) -> str:
+    return f"time_slot_id {sid or '(none)'}" + (f" geo {geo}" if geo else "")
+
+
+def _need(data: Eits, key: tuple, ds: str) -> dict[str, float]:
+    """{YYYY-MM: value} for a series the page uses: the US rows when the response has regions, and
+    exactly one value per month."""
     if key not in data:
         raise SourceError(f"Census EITS {ds}: {'/'.join(key)} not found; combinations: {combinations(data)}")
     out = {}
-    for m, slots in data[key].items():
-        vals = set(slots.values())
+    for m, cells in data[key].items():
+        if getattr(data, "has_geo", False):
+            cells = {k: v for k, v in cells.items() if k[0] == "US"}
+            if not cells:
+                continue
+        vals = set(cells.values())
         if len(vals) > 1:
-            listed = ", ".join(f"time_slot_id {k or '(none)'} = {v}" for k, v in sorted(slots.items()))
-            raise SourceError(f"Census EITS {ds}: {'/'.join(key)} has {len(slots)} values for {m}: {listed}")
+            listed = ", ".join(f"{_where(*k)} = {v}" for k, v in sorted(cells.items()))
+            raise SourceError(f"Census EITS {ds}: {'/'.join(key)} has {len(cells)} values for {m}: {listed}")
         out[m] = vals.pop()
+    if not out:
+        raise SourceError(f"Census EITS {ds}: {'/'.join(key)} has no US rows")
     return out
+
+
+class HousingRangeError(SourceError):
+    """A starts or permits value is outside the plausible range; `diagnostics` holds the breakdown."""
+
+    def __init__(self, msg: str, diagnostics: list[str]):
+        super().__init__(msg)
+        self.diagnostics = diagnostics
+
+
+def housing_diagnostics(data: Eits, months: int = 6) -> list[str]:
+    """Every ASTARTS and APERMITS combination in the response, by region and time slot, last six
+    months. EITS has no unit field, so values are shown as returned."""
+    lines = ["EITS returns no unit field; values are cell_value as returned (the page expects thousands, SAAR)."]
+    for cat in (STARTS[0], PERMITS[0]):
+        for key in sorted(k for k in data if k[0] == cat):
+            last = sorted(data[key])[-months:]
+            cells = sorted({c for m in last for c in data[key][m]})
+            for geo, sid in cells:
+                name = getattr(data, "slot_names", {}).get(sid)
+                vals = ", ".join(f"{m} {data[key][m][(geo, sid)]:g}" if (geo, sid) in data[key][m] else f"{m} n/a"
+                                 for m in last)
+                lines.append(f"{'/'.join(key)} geo {geo or '(not returned)'} time_slot_id {sid or '(none)'}"
+                             + (f" ({name})" if name else "") + f": {vals}")
+    return lines
 
 
 def compute_retail(data: dict) -> dict:
@@ -113,13 +162,14 @@ def compute_housing(data: dict) -> dict:
         m = max(s)
         for k in (m, month_add(m, -1)):
             if k in s and not HOUSING_RANGE[0] <= s[k] <= HOUSING_RANGE[1]:
-                raise SourceError(f"Census EITS resconst: {name} {k} = {s[k]} is outside {HOUSING_RANGE} thousand")
+                raise HousingRangeError(f"Census EITS resconst: {name} {k} = {s[k]} is outside {HOUSING_RANGE} thousand",
+                                        housing_diagnostics(data))
         out[name] = {"period": m, "latest": round(s[m] / 1000, 3), "pperiod": month_add(m, -1),
                      "prior": round(s[month_add(m, -1)] / 1000, 3) if month_add(m, -1) in s else None}
     return out
 
 
-def get_eits(ds: str, api_key: str, today: dt.date) -> dict:
+def get_eits(ds: str, api_key: str, today: dt.date) -> Eits:
     if not api_key:
         raise SourceError("Census EITS: no CENSUS_API_KEY")
     url = URL_EITS.format(ds=ds, y=today.year - 1, k=api_key)
