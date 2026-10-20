@@ -10,7 +10,7 @@ import datetime as dt
 import json
 import re
 
-from .common import SourceError, fetch, month_add, num
+from .common import SourceError, contact_headers, fetch, month_add, num
 
 URL_API = "https://api.bls.gov/publicAPI/v2/timeseries/data/"
 URL_ICS = "https://www.bls.gov/schedule/news_release/bls.ics"
@@ -82,12 +82,12 @@ def compute(series: dict[str, dict]) -> dict:
     return out
 
 
-def get(api_key: str | None, today: dt.date) -> dict:
+def get(api_key: str | None, today: dt.date, contact: str | None = None) -> dict:
     body = {"seriesid": list(SERIES.values()), "startyear": str(today.year - 2), "endyear": str(today.year),
             "calculations": True}
     if api_key:
         body["registrationkey"] = api_key
-    text = fetch(URL_API, method="POST", json=body, label="BLS API").decode("utf-8")
+    text = fetch(URL_API, method="POST", json=body, label="BLS API", headers=contact_headers(contact)).decode("utf-8")
     return compute(parse_api(text))
 
 
@@ -139,5 +139,5 @@ def parse_ics(text: str) -> list[dict]:
     return out
 
 
-def get_calendar() -> list[dict]:
-    return parse_ics(fetch(URL_ICS).decode("utf-8", "replace"))
+def get_calendar(contact: str | None = None) -> list[dict]:
+    return parse_ics(fetch(URL_ICS, headers=contact_headers(contact)).decode("utf-8", "replace"))

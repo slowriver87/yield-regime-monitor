@@ -45,5 +45,12 @@ from the first runner dry run (the run summary lists any label or code it could 
 | BEA API | No `BEA_API_KEY` (`bea_api_invalid_key.json` is the live error). The T10401 line label is a guess. | `bea_api_doc_sample_T*.json` |
 | Census EITS | No `CENSUS_API_KEY` (live answer: "Missing Key"). Category codes `44X72, 441, 447, 444, 722 / SM` and `STARTS, PERMITS / TOTAL` are from the EITS documentation. | `census_eits_doc_sample_*.json` |
 | FRED API | No `FRED_API_KEY` (`fred_api_bad_key.json` is the live error). | `fred_api_doc_sample.json` |
+| FRED ICSA (claims fallback) | Same. FRED's unit for ICSA is "Number"; the script divides by 1,000. | `fred_icsa_doc_sample.json` |
 | fredgraph.csv | Timed out from here (15 s and 30 s). Header assumed `observation_date,BAMLH0A0HYM2` (older files: `DATE`). | `fredgraph_doc_sample.csv` |
 | DOL data.pdf | dol.gov answered 403. The headline and release lines are the handoff's verified wording; the `Initial Claims (SA)` table row is assumed. | `dol_claims_doc_sample.txt` |
+
+## From the first GitHub runner dry run (Oct 20, 2026)
+
+- BLS API, BEA API (including the T10401 line "Final sales to private domestic purchasers") and Census `marts` (`44X72, 441, 447, 444, 722 / SM / yes`) worked with real keys; their seed values matched.
+- Census `resconst` holds more than one value per month in a series the page does not use (`ACOMPLETIONS/SINGLE/yes`, 2025-06), so duplicates are now checked only in the series the page reads. The run summary lists every code combination.
+- DOL `data.pdf` and BLS `bls.ics` answered 403 to the runner too.

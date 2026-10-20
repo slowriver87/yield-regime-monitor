@@ -10,7 +10,7 @@ import datetime as dt
 import io
 import re
 
-from .common import MONTH_NAME, SourceError, fetch
+from .common import MONTH_NAME, SourceError, contact_headers, fetch
 
 URL = "https://www.dol.gov/ui/data.pdf"
 NAMES = "|".join(MONTH_NAME)
@@ -59,5 +59,5 @@ def read_pdf(content: bytes) -> dict:
     return parse_text(text)
 
 
-def get() -> dict:
-    return read_pdf(fetch(URL))
+def get(contact: str | None = None) -> dict:
+    return read_pdf(fetch(URL, headers=contact_headers(contact)))

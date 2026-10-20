@@ -213,6 +213,8 @@ class Run:
     seed_mismatch: list = field(default_factory=list)
     layouts: list = field(default_factory=list)     # printouts for the summary when a parser fails
     new_sources: set = field(default_factory=set)   # sources with a new data date this run
+    trading_days: set | None = None                 # dates in the Treasury par yield file
+    census_codes: dict = field(default_factory=dict)  # dataset -> code combinations, for the summary
 
     def __post_init__(self):
         self.new = copy.deepcopy(self.old)
@@ -320,6 +322,7 @@ def do_treasury(run: Run):
         run.notes.append(f"Treasury par CSV not read ({err}); XML used.")
 
     newest = max(par)
+    run.trading_days = set(par)
     if newest < run.old["DATA"]["par"]["dates"][-1]:
         run.not_reached("par", f"newest date {newest} is older than the page's")
         return run.not_reached("real", "par yields older than the page", "Treasury par curve")
@@ -401,6 +404,8 @@ def do_fred(run: Run):
             run.attention.append(f"HY OAS: FRED not reached and the latest point ({old_last}) is more than "
                                  "5 business days old.")
         return
+    # Trading days only, so the page's five-session change spans five bond-market sessions
+    obs = fred.trading_days_only(obs, run.trading_days)
     daily = [[d, round(v, 2)] for d, v in sorted(obs.items())][-6:]
     if len(daily) < 6:
         return run.not_reached("fred", f"only {len(daily)} observations")
@@ -560,7 +565,7 @@ def _set_score(run: Run, sid: str, r: dict, extra: tuple = ()) -> bool:
 
 def do_bls(run: Run):
     try:
-        b = bls.get(run.keys.get("BLS_API_KEY"), run.today)
+        b = bls.get(run.keys.get("BLS_API_KEY"), run.today, run.keys.get("CONTACT_EMAIL"))
     except SourceError as e:
         return run.not_reached("bls", e)
     run.fresh["bls"] = b["ur"]["period"]
@@ -593,27 +598,40 @@ def do_bls(run: Run):
 
 
 def do_dol(run: Run):
+    """Initial claims from the DOL release; if it cannot be read, from FRED ICSA (no tie check then)."""
+    source = None
     try:
-        c = dol.get()
+        c = dol.get(run.keys.get("CONTACT_EMAIL"))
+        r = {"period": c["week"], "latest": c["latest"],
+             "pperiod": (parse_iso(c["week"]) - dt.timedelta(7)).isoformat(), "prior": c["prior"]}
+        ok = c["table_prior"] is not None and c["table_prior"] == c["prior_exact"]
+        how = "Single source; prior ties to the table."
     except SourceError as e:
-        return run.not_reached("dol", e)
-    r = {"period": c["week"], "latest": c["latest"], "pperiod": (parse_iso(c["week"]) - dt.timedelta(7)).isoformat(),
-         "prior": c["prior"]}
-    ok = c["table_prior"] is not None and c["table_prior"] == c["prior_exact"]
+        try:
+            f = fred.icsa(fred.get_api_series("ICSA", run.keys.get("FRED_API_KEY")))
+        except SourceError as e2:
+            return run.not_reached("dol", f"{e}; FRED ICSA: {e2}", "Department of Labor and FRED ICSA")
+        run.notes.append(f"Initial claims: Department of Labor not read ({e}); FRED ICSA used.")
+        r = {"period": f["week"], "latest": f["latest"], "pperiod": f["pweek"], "prior": f["prior"]}
+        ok, how, source = True, "Fallback: FRED ICSA.", "FRED ICSA (fallback)"
     if not ok:
         r.update(latest=None, prior=None)
     try:
         fresh = _set_score(run, "claims", r)
     except SourceError as e:
         return run.not_reached("dol", e)
-    run.fresh["dol"] = c["week"]
+    run.fresh["dol"] = r["period"]
     why = "the row failed the tie check (prior vs the release table)"
     if not ok and fresh:
-        run.flag("dol", c["week"], why)
-    res = null_result(c["week"], why) if not ok else new_result(c["week"], "Single source; prior ties to the table.") \
-        if fresh else "No new release."
+        run.flag("dol", r["period"], why)
+    if not ok:
+        res = null_result(r["period"], why)
+    elif fresh:
+        res = new_result(r["period"], how)
+    else:
+        res = "No new release." + (" Fallback: FRED ICSA." if source else "")
     run.write_log("Initial claims", "n/a" if r["latest"] is None else f"{r['latest']}k",
-                  f"Week to {period_label(c['week'])}", res)
+                  f"Week to {period_label(r['period'])}", res, source)
 
 
 def do_bea(run: Run):
@@ -746,7 +764,9 @@ def do_g17(run: Run):
 def do_census(run: Run, cal: list[dict] | None):
     key = run.keys.get("CENSUS_API_KEY")
     try:
-        h = census.compute_housing(census.get_eits("resconst", key, run.today))
+        data = census.get_eits("resconst", key, run.today)
+        run.census_codes["resconst"] = census.combinations(data)
+        h = census.compute_housing(data)
         f1, f2 = _set_score(run, "starts", h["starts"]), _set_score(run, "permits", h["permits"])
         run.fresh["housing"] = h["starts"]["period"]
         per = h["starts"]["period"]
@@ -754,11 +774,13 @@ def do_census(run: Run, cal: list[dict] | None):
                       " / ".join("n/a" if h[k]["latest"] is None else f"{h[k]['latest']:.3f}M" for k in ("starts", "permits")),
                       period_label(per), new_result(per, "Single source.") if (f1 or f2) else "No new release.")
     except SourceError as e:
-        if "not found" in str(e) or "outside" in str(e):
+        if "not found" in str(e) or "outside" in str(e) or "values for" in str(e):
             run.layouts.append(str(e))
         run.not_reached("housing", e, "Census")
     try:
-        rt = census.compute_retail(census.get_eits("marts", key, run.today))
+        data = census.get_eits("marts", key, run.today)
+        run.census_codes["marts"] = census.combinations(data)
+        rt = census.compute_retail(data)
         old = run.old["CONS"]["ctrl"]
         last = rt["months"][-1]
         if last < old["months"][-1]:
@@ -864,7 +886,7 @@ def build_calendar(run: Run, census_cal: list[dict] | None) -> list[dict]:
     group("University of Michigan", lambda: [umich.get_next()])
     group("Federal Reserve", lambda: fomc.get(years))
     group("BEA", bea.get_dates)
-    group("BLS", bls.get_calendar)
+    group("BLS", lambda: bls.get_calendar(run.keys.get("CONTACT_EMAIL")))
     items = fixed_thursdays(start, end)
     for src, evs in groups.items():
         if evs is None:  # keep this source's rows from the last calendar while they are still ahead
@@ -948,6 +970,7 @@ class Diff:
     new: object
     old_date: str | None
     revision: bool
+    added: bool = False     # a new date inside a multi-date window (no old value to pair it with)
 
 
 def diff_blocks(old: dict, new: dict) -> list[Diff]:
@@ -959,6 +982,9 @@ def diff_blocks(old: dict, new: dict) -> list[Diff]:
             if d not in nv:
                 continue  # dropped off the end of a rolling window
             if d in ov and ov[d] == nv[d]:
+                continue
+            if d not in ov and len(nv) > 1 and d != max(nv):
+                out.append(Diff(f, src, d, None, nv[d], None, False, added=True))
                 continue
             od = d if d in ov else (max(ov) if ov else None)
             out.append(Diff(f, src, d, ov.get(d) if d in ov else (ov[od] if od else None), nv[d], od,
@@ -1172,7 +1198,11 @@ def run_update(page: Path, summary_path: Path, dry_run: bool, commit_msg: Path |
     set_output("attention", "false")
     today = today or et_today()
     keys = keys if keys is not None else {k: os.environ.get(k, "") for k in
-                                         ("BLS_API_KEY", "BEA_API_KEY", "CENSUS_API_KEY", "FRED_API_KEY", "EIA_API_KEY")}
+                                         ("BLS_API_KEY", "BEA_API_KEY", "CENSUS_API_KEY", "FRED_API_KEY", "EIA_API_KEY",
+                                          "CONTACT_EMAIL")}
+    if keys.get("CONTACT_EMAIL") and os.environ.get("GITHUB_ACTIONS") == "true":
+        print(f"::add-mask::{keys['CONTACT_EMAIL']}")  # masks any later appearance in the job log
+    say(f"- Contact User-Agent for BLS and DOL: {'set' if keys.get('CONTACT_EMAIL') else 'not set (COMMIT_EMAIL empty)'}.")
     run = None
     try:
         html = page.read_text(encoding="utf-8")
@@ -1212,8 +1242,12 @@ def run_update(page: Path, summary_path: Path, dry_run: bool, commit_msg: Path |
         say("| Field | Old → new | Data date | Source |")
         say("|---|---|---|---|")
         for d in diffs:
-            od = f" ({d.old_date})" if d.old_date and d.old_date != d.date else ""
-            say(f"| `{d.field}` | {dump(d.old)}{od} → {dump(d.new)}{' (revised)' if d.revision else ''} | {d.date} | {SOURCE_NAMES[d.source]} |")
+            if d.added:
+                change = f"added: {dump(d.new)}"
+            else:
+                od = f" ({d.old_date})" if d.old_date and d.old_date != d.date else ""
+                change = f"{dump(d.old)}{od} → {dump(d.new)}{' (revised)' if d.revision else ''}"
+            say(f"| `{d.field}` | {change} | {d.date} | {SOURCE_NAMES[d.source]} |")
     else:
         say("Nothing new from any source.")
     cal_changed = run.new["CAL"] != old["CAL"]
@@ -1222,6 +1256,10 @@ def run_update(page: Path, summary_path: Path, dry_run: bool, commit_msg: Path |
     say("\n".join(f"- {m}" for m in all_moves) if all_moves else "None.")
     say("\n### Sources not reached\n")
     say("\n".join(f"- {u}" for u in run.unreached) if run.unreached else "None.")
+    if run.census_codes:
+        say("\n### Census EITS code combinations (category/data type/seasonally adjusted)\n")
+        for ds, codes in run.census_codes.items():
+            say(f"- {ds} ({len(codes)}): {', '.join(codes)}")
     if run.layouts:
         say("\n### Layouts to map (a parser could not find its fields)\n")
         say("\n".join(f"- {l}" for l in run.layouts))

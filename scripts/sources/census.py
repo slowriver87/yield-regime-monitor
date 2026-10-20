@@ -33,9 +33,11 @@ CAL_EVENTS = {
 }
 
 
-def parse_eits(text: str, ds: str) -> dict[tuple, dict[str, float]]:
-    """Array of arrays with a header row -> {(category, data type, seasonally_adj): {YYYY-MM: value}}.
-    Rows with error_data 'yes' (margins of error) are skipped."""
+def parse_eits(text: str, ds: str) -> dict[tuple, dict[str, dict[str, float]]]:
+    """Array of arrays with a header row ->
+    {(category, data type, seasonally_adj): {YYYY-MM: {time_slot_id: value}}}.
+    Rows with error_data 'yes' (margins of error) are skipped. Several values for one month are kept
+    here; only a series the page uses must have one value per month (see `_need`)."""
     try:
         rows = json.loads(text)
     except ValueError:
@@ -46,8 +48,9 @@ def parse_eits(text: str, ds: str) -> dict[tuple, dict[str, float]]:
     need = ["cell_value", "data_type_code", "error_data", "category_code", "seasonally_adj", "time"]
     if any(n not in h for n in need):
         raise SourceError(f"Census EITS {ds}: unexpected header {h}")
-    ix = {n: h.index(n) for n in need + (["time_slot_id"] if "time_slot_id" in h else [])}
-    out: dict[tuple, dict[str, float]] = {}
+    ix = {n: h.index(n) for n in need}
+    slot = h.index("time_slot_id") if "time_slot_id" in h else None
+    out: dict[tuple, dict[str, dict[str, float]]] = {}
     for r in rows[1:]:
         if str(r[ix["error_data"]]).lower() != "no":
             continue
@@ -58,20 +61,30 @@ def parse_eits(text: str, ds: str) -> dict[tuple, dict[str, float]]:
         except (TypeError, ValueError):
             continue
         key = (r[ix["category_code"]], r[ix["data_type_code"]], str(r[ix["seasonally_adj"]]).lower())
-        series = out.setdefault(key, {})
-        if r[ix["time"]] in series and series[r[ix["time"]]] != v:
-            raise SourceError(f"Census EITS {ds}: two values for {key} {r[ix['time']]} (time slots?)")
-        series[r[ix["time"]]] = v
+        sid = str(r[slot]) if slot is not None else ""
+        out.setdefault(key, {}).setdefault(r[ix["time"]], {})[sid] = v
     if not out:
         raise SourceError(f"Census EITS {ds}: no data rows")
     return out
 
 
+def combinations(data: dict) -> list[str]:
+    """Distinct category/data type/seasonally_adj combinations, for the run summary."""
+    return sorted(f"{c}/{d}/{s}" for c, d, s in data)
+
+
 def _need(data: dict, key: tuple, ds: str) -> dict[str, float]:
+    """{YYYY-MM: value} for a series the page uses; it must have one value per month."""
     if key not in data:
-        combos = sorted(f"{c}/{d}/{s}" for c, d, s in data)
-        raise SourceError(f"Census EITS {ds}: {'/'.join(key)} not found; combinations: {combos[:80]}")
-    return data[key]
+        raise SourceError(f"Census EITS {ds}: {'/'.join(key)} not found; combinations: {combinations(data)}")
+    out = {}
+    for m, slots in data[key].items():
+        vals = set(slots.values())
+        if len(vals) > 1:
+            listed = ", ".join(f"time_slot_id {k or '(none)'} = {v}" for k, v in sorted(slots.items()))
+            raise SourceError(f"Census EITS {ds}: {'/'.join(key)} has {len(slots)} values for {m}: {listed}")
+        out[m] = vals.pop()
+    return out
 
 
 def compute_retail(data: dict) -> dict:
