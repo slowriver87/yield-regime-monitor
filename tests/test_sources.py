@@ -237,8 +237,8 @@ def test_census_samples_match_seed():
 
 def test_census_missing_code_lists_combinations():
     rows = json.loads(text("census_eits_doc_sample_resconst.json"))
-    rows = [rows[0]] + [r for r in rows[1:] if r[4] != "PERMITS"]
-    with pytest.raises(common.SourceError, match="combinations: .*STARTS/TOTAL/yes"):
+    rows = [rows[0]] + [r for r in rows[1:] if r[4] != "APERMITS"]
+    with pytest.raises(common.SourceError, match="combinations: .*ASTARTS/TOTAL/yes"):
         census.compute_housing(census.parse_eits(json.dumps(rows), "resconst"))
 
 
@@ -327,3 +327,42 @@ def test_fetch_error_hides_url_with_key(monkeypatch):
     with pytest.raises(common.SourceError) as e:
         common.fetch("https://example.invalid/?key=SECRET", waits=(), label="Census EITS")
     assert "SECRET" not in str(e.value)
+
+
+def test_claims_real_release_extract_ties():
+    c = dol.parse_text(text("dol_claims_101526_extract.txt"))
+    assert (c["week"], c["released"], c["latest"], c["prior"]) == ("2026-10-10", "2026-10-15", 199, 198)
+    assert c["table_prior"] == c["prior_exact"] == 198000
+
+
+def test_claims_pdf_reads_beyond_page_3(monkeypatch):
+    """The table row sits on page 4 of the real release; reading only pages 1-3 failed the tie."""
+    import pdfplumber
+    lines = text("dol_claims_101526_extract.txt").split("# Page 4")
+    pages = [lines[0], "page 2", "page 3", lines[1]]
+
+    class Page:
+        def __init__(self, t):
+            self.t = t
+
+        def extract_text(self):
+            return self.t
+
+    class Pdf:
+        def __init__(self):
+            self.pages = [Page(t) for t in pages]
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+    monkeypatch.setattr(pdfplumber, "open", lambda f: Pdf())
+    assert dol.read_pdf(b"%PDF")["table_prior"] == 198000
+
+
+def test_census_housing_uses_annual_rate_codes():
+    assert census.STARTS == ("ASTARTS", "TOTAL", "yes") and census.PERMITS == ("APERMITS", "TOTAL", "yes")
+    # the plain codes exist only not seasonally adjusted (runner dry run, Oct 20, 2026)
+    rows = json.loads(text("census_eits_doc_sample_resconst.json"))
+    assert {r[4] for r in rows[1:] if r[5] == "yes" and r[3] == "no"} == {"ASTARTS", "APERMITS"}

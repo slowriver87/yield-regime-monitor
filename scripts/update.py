@@ -253,6 +253,15 @@ class Run:
             old = next(r for r in self.old["LOG"] if r[0] == lab)
             self.write_log(lab, old[1], old[2], f"Not updated: {what} not reached.", reread=False)
 
+    def keep_page(self, src: str, date: str, why: str, rows: list[str] | None = None):
+        """A re-read of a data date the page already holds failed a second read or a tie: keep the
+        page's value (never null it under an old date), say why, and open the issue."""
+        self.attention.append(f"{SOURCE_NAMES[src]}: the re-read of {date} failed ({why}); the page value was kept.")
+        for lab in rows or LOG_ROWS[src]:
+            old = next(r for r in self.old["LOG"] if r[0] == lab)
+            self.write_log(lab, old[1], old[2], f"Kept page value: re-read of {period_label(date)} failed ({why}).",
+                           reread=False)
+
     def flag(self, src: str, date: str, why: str):
         """A value was nulled for a new data date: say so in the issue."""
         self.attention.append(f"{SOURCE_NAMES[src]}: showed {date} but {why}; the value was set to null.")
@@ -455,6 +464,8 @@ def do_freddie(run: Run):
         how = "Primary, one read (workbook " + ("not read" if xlsx_v is None else f"not yet showing {period_label(last)}") + ")."
     else:
         how = "Fallback: workbook (CSV not reached)."
+    if how is None and not fresh:
+        return run.keep_page("freddie", last, "the CSV and the workbook disagree")
     run.D["mortgage"] = {**old, "weekly": weekly, "yago": yago(w, last)}
     s = run.score("mort")
     prev = sorted(w)[-2]
@@ -498,6 +509,8 @@ def do_eia(run: Run):
     else:
         how = "Fallback: spot price table." if key else "Spot price table, one read (no API key)."
     fresh = is_new(d, old["date"])
+    if how is None and not fresh:
+        return run.keep_page("eia", d, "the API and the spot table disagree")
     if how is None:
         val = None
         if fresh:
@@ -520,6 +533,8 @@ def do_auction(run: Run):
     fresh = is_new(a["date"], old["date"])
     tie = a.pop("tie")
     ok = tie is not None and abs(tie - 100) <= auctions.SHARE_TIE
+    if not ok and not fresh:
+        return run.keep_page("auction", a["date"], "the bidder shares failed the tie check")
     if not ok:
         a["dealer"] = a["indirect"] = None
         if fresh:
@@ -543,9 +558,11 @@ def do_factset(run: Run):
     if v["report"] < old["report"]:
         return run.not_reached("factset", f"newest report {v['report']} is older than the page's {old['report']}")
     fresh = is_new(v["report"], old["report"])
+    missing = [k for k in ("pe", "price") if v[k] is None]
+    if missing and not fresh:
+        return run.keep_page("factset", v["report"], f"the {' and '.join(missing)} sentence could not be read")
     run.D["val"] = v
     run.fresh["factset"] = v["report"]
-    missing = [k for k in ("pe", "price") if v[k] is None]
     if missing and fresh:
         run.flag("factset", v["report"], f"the {' and '.join(missing)} sentence could not be read")
     res = (null_result(v["report"], f"the {' and '.join(missing)} sentence could not be read") if missing
@@ -577,11 +594,14 @@ def do_bls(run: Run):
         nfp.update(latest=None, prior=None, avg3=None)
     rows = {}
     try:
-        fresh = _set_score(run, "nfp", nfp, ("avg3",))
-        if bad and fresh:
-            run.flag("bls", nfp["period"], f"payroll changes for {bad} did not tie to the level differences")
-        rows["Nonfarm payrolls"] = (signed(nfp["latest"], 0, "k"), nfp["period"], fresh,
-                                    None if not bad else "payroll changes did not tie to the levels")
+        if bad and not is_new(nfp["period"], run.old_score("nfp").get("period")):
+            run.keep_page("bls", nfp["period"], "payroll changes did not tie to the levels", ["Nonfarm payrolls"])
+        else:
+            fresh = _set_score(run, "nfp", nfp, ("avg3",))
+            if bad and fresh:
+                run.flag("bls", nfp["period"], f"payroll changes for {bad} did not tie to the level differences")
+            rows["Nonfarm payrolls"] = (signed(nfp["latest"], 0, "k"), nfp["period"], fresh,
+                                        None if not bad else "payroll changes did not tie to the levels")
         for sid, lab, fmt in (("ur", "Unemployment rate", lambda r: pct_s(r["latest"], 1)),
                               ("ahe", "Average hourly earnings", lambda r: f"{pct_s(r['latest'], 1)} y/y"),
                               ("ppi", "PPI final demand", lambda r: f"{pct_s(r['latest'], 1)} y/y")):
@@ -614,6 +634,9 @@ def do_dol(run: Run):
         run.notes.append(f"Initial claims: Department of Labor not read ({e}); FRED ICSA used.")
         r = {"period": f["week"], "latest": f["latest"], "pperiod": f["pweek"], "prior": f["prior"]}
         ok, how, source = True, "Fallback: FRED ICSA.", "FRED ICSA (fallback)"
+    why = "the row failed the tie check (prior vs the release table)"
+    if not ok and not is_new(r["period"], run.old_score("claims").get("period")):
+        return run.keep_page("dol", r["period"], why)
     if not ok:
         r.update(latest=None, prior=None)
     try:
@@ -621,7 +644,6 @@ def do_dol(run: Run):
     except SourceError as e:
         return run.not_reached("dol", e)
     run.fresh["dol"] = r["period"]
-    why = "the row failed the tie check (prior vs the release table)"
     if not ok and fresh:
         run.flag("dol", r["period"], why)
     if not ok:
@@ -720,6 +742,8 @@ def do_gdpnow(run: Run):
         q = page["quarter"]
         r = {"period": page["date"], "latest": page["v"], "pperiod": None, "prior": None}
         how = "Fallback: GDPNow page (workbook not read)."
+    if how is None and not is_new(r["period"], run.old_score("gdpnow").get("period")):
+        return run.keep_page("gdpnow", r["period"], "the workbook and the page disagree")
     if how is None:
         r["latest"] = None
     r["note"] = f"{q[4:]} {q[:4]} estimate"
@@ -746,6 +770,8 @@ def do_g17(run: Run):
     elif abs(g["text"] - g["latest"]) < 1e-9:
         how = "Table and release sentence agree."
     else:
+        if not is_new(g["period"], run.old_score("ip").get("period")):
+            return run.keep_page("g17", g["period"], "the table and the release sentence disagree")
         how = None
         r["latest"] = None
     try:
@@ -789,6 +815,9 @@ def do_census(run: Run, cal: list[dict] | None):
         released = next((c["d"] for c in (cal or []) if c["id"] == "retail" and c.get("period") == last), None)
         if released is None:
             released = old["released"] if last == old["months"][-1] else None
+        if not rt["tie_ok"] and not fresh:
+            run.census_codes.setdefault("marts", census.combinations(data))
+            return run.keep_page("retail", last, "a component was not smaller than the total (tie check)")
         v = rt["v"] if rt["tie_ok"] else [None] * len(rt["v"])
         run.new["CONS"]["ctrl"] = {"months": rt["months"], "v": v, "released": released}
         run.fresh["retail"] = last
@@ -1225,6 +1254,10 @@ def run_update(page: Path, summary_path: Path, dry_run: bool, commit_msg: Path |
             say("\n### Sources not reached")
             for u in run.unreached:
                 say(f"- {u}")
+        if run and run.attention:
+            say("\n### Values set to null this run (why)")
+            for x in run.attention:
+                say(f"- {x}")
         if run and run.layouts:
             say("\n### Layouts to map")
             for l in run.layouts:

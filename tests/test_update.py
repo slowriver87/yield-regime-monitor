@@ -315,8 +315,8 @@ def test_census_duplicate_in_unused_series_is_ignored(offline):
     assert census.compute_housing(data)["starts"]["latest"] == 1.275
     assert "ACOMPLETIONS/SINGLE/yes" in census.combinations(data)
     # the same duplicate in a series the page uses stops that series and names the time slots
-    rows += [["1290", "TOTAL", "2", "no", "STARTS", "yes", "2026-08"]]
-    with pytest.raises(common.SourceError, match=r"STARTS/TOTAL/yes has 2 values for 2026-08: "
+    rows += [["1290", "TOTAL", "2", "no", "ASTARTS", "yes", "2026-08"]]
+    with pytest.raises(common.SourceError, match=r"ASTARTS/TOTAL/yes has 2 values for 2026-08: "
                                                  r"time_slot_id 0 = 1275.0, time_slot_id 2 = 1290.0"):
         census.compute_housing(census.parse_eits(json.dumps([h] + rows[1:]), "resconst"))
 
@@ -325,7 +325,7 @@ def test_census_identical_values_in_two_slots_are_one_value():
     from conftest import text as fx
     from sources import census
     rows = json.loads(fx("census_eits_doc_sample_resconst.json"))
-    rows += [["1275", "TOTAL", "1", "no", "STARTS", "yes", "2026-08"]]
+    rows += [["1275", "TOTAL", "1", "no", "ASTARTS", "yes", "2026-08"]]
     assert census.compute_housing(census.parse_eits(json.dumps(rows), "resconst"))["starts"]["latest"] == 1.275
 
 
@@ -333,7 +333,7 @@ def test_run_summary_lists_census_codes_and_added_values(tmp_path, offline, caps
     rc, _ = run(tmp_path, dry_run=True)
     out = capsys.readouterr().out
     assert rc == 0
-    assert "### Census EITS code combinations" in out and "- resconst (4): PERMITS/TOTAL/no, PERMITS/TOTAL/yes, STARTS/TOTAL/no, STARTS/TOTAL/yes" in out
+    assert "### Census EITS code combinations" in out and "- resconst (4): APERMITS/TOTAL/yes, ASTARTS/TOTAL/yes, PERMITS/TOTAL/no, STARTS/TOTAL/no" in out
     # July and August are added inside the control-group window: no pairing with September's value
     assert "| `CONS.ctrl.v` | added: 0.1 | 2026-07 | Census |" in out
     # the newest par date still shows the previous newest value
@@ -416,3 +416,36 @@ def test_hy_oas_skips_bond_market_holiday_oct_12(tmp_path, offline):
     trading = {"2026-10-09", "2026-10-13"}
     kept = fred.trading_days_only({"2026-10-09": 1.0, "2026-10-12": 1.0, "2026-10-13": 1.0, "2026-10-14": 1.0}, trading)
     assert sorted(kept) == ["2026-10-09", "2026-10-13", "2026-10-14"]  # a business day after the par file is kept
+
+
+def test_failed_tie_on_a_week_the_page_holds_keeps_the_page_value(tmp_path, offline):
+    """Runs #2 and #3: the claims table was not found on a re-read of the seeded week. The page value
+    stays (never null under an old date), the seed note stays, and the issue says why."""
+    good = offline["dol"]
+    offline["dol"] = lambda: {**good(), "table_prior": None}
+    rc, new = run(tmp_path)
+    assert rc == 0
+    b = u.load_page(new)
+    s = next(r for r in b["SCORE"] if r["id"] == "claims")
+    assert (s["latest"], s["prior"]) == (199, 198)
+    row = next(r for r in b["LOG"] if r[0] == "Initial claims")
+    assert row[5].startswith("Kept page value: re-read of Oct 10 failed (the row failed the tie check")
+    assert u.SEED_MARK in row[5]
+    assert "the page value was kept" in (tmp_path / "issue.md").read_text()
+
+
+@pytest.mark.parametrize("src,patch,label,kept", [
+    ("auction", lambda g: (lambda: {**g(), "tie": 97.0}), "Latest coupon auction", lambda b: b["DATA"]["auction"]),
+    ("g17", lambda g: (lambda: {**g(), "text": 0.5}), "Industrial production",
+     lambda b: next(r for r in b["SCORE"] if r["id"] == "ip")["latest"]),
+    ("gdpnow_page", lambda g: (lambda: {**g(), "v": 3.9}), "GDPNow",
+     lambda b: next(r for r in b["SCORE"] if r["id"] == "gdpnow")["latest"]),
+    ("factset", lambda g: (lambda: {**g(), "pe": None}), "Forward P/E (FactSet)", lambda b: b["DATA"]["val"]),
+])
+def test_failed_reread_of_same_date_keeps_page_value(tmp_path, offline, src, patch, label, kept):
+    offline[src] = patch(offline[src])
+    rc, new = run(tmp_path)
+    b = u.load_page(new)
+    assert rc == 0 and kept(b) == kept(blocks())
+    row = next(r for r in b["LOG"] if r[0] == label)
+    assert row[5].startswith("Kept page value: re-read of")

@@ -21,8 +21,10 @@ URL_CAL = "https://www.census.gov/economic-indicators/calendar-listview-{y}.html
 RETAIL_TOTAL = ("44X72", "SM", "yes")
 RETAIL_EXCLUDED = {"autos": ("441", "SM", "yes"), "gas": ("447", "SM", "yes"),
                    "building": ("444", "SM", "yes"), "food_services": ("722", "SM", "yes")}
-STARTS = ("STARTS", "TOTAL", "yes")
-PERMITS = ("PERMITS", "TOTAL", "yes")
+# Annual-rate series carry an "A" prefix (ASTARTS, APERMITS); the plain codes are monthly counts and
+# exist only not seasonally adjusted (verified in the Oct 20, 2026 runner dry run)
+STARTS = ("ASTARTS", "TOTAL", "yes")
+PERMITS = ("APERMITS", "TOTAL", "yes")
 HOUSING_RANGE = (300, 3000)  # thousands of units, SAAR: a value outside means a wrong code
 
 CAL_EVENTS = {
