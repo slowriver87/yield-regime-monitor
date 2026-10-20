@@ -1,8 +1,8 @@
 """Department of Labor weekly claims release (data.pdf): seasonally adjusted initial claims.
 
 dol.gov answered 403 to the build environment, so this parser follows the sentence and table
-wording quoted in HANDOFF.md (verified there through a web reader) and is NOT VERIFIED against a
-downloaded file. See tests/fixtures/README.md.
+wording quoted in HANDOFF.md. The Oct 15, 2026 release was later downloaded (fixture
+dol_claims_101526_extract.txt): the headline is on page 1 and the 'Initial Claims (SA)' table row on page 4.
 """
 from __future__ import annotations
 
@@ -53,7 +53,8 @@ def read_pdf(content: bytes) -> dict:
     import pdfplumber
     try:
         with pdfplumber.open(io.BytesIO(content)) as pdf:
-            text = "\n".join(p.extract_text() or "" for p in pdf.pages[:3])
+            # every page: the 'Initial Claims (SA)' table row is on page 4 (verified Oct 15, 2026 release)
+            text = "\n".join(p.extract_text() or "" for p in pdf.pages)
     except Exception as e:
         raise SourceError(f"DOL PDF: {e}")
     return parse_text(text)
