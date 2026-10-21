@@ -1,20 +1,20 @@
 {
-  "updated": "2026-10-20",
-  "yields_date": "2026-10-20",
-  "y2": 4.79,
-  "y10": 5.12,
+  "updated": "2026-10-21",
+  "yields_date": "2026-10-21",
+  "y2": 4.81,
+  "y10": 5.13,
   "y30": 5.42,
-  "curve": 0.33,
-  "real": 2.77,
-  "be": 2.35,
-  "split_date": "2026-10-20",
+  "curve": 0.32,
+  "real": 2.76,
+  "be": 2.37,
+  "split_date": "2026-10-21",
   "hy": 3.29,
   "hy_date": "2026-10-19",
-  "gap": 0.14,
+  "gap": 0.13,
   "fed": {
     "lo": 3.75,
     "hi": 4.0,
-    "date": "2026-10-19"
+    "date": "2026-10-20"
   },
   "mort": 7.4,
   "mort_date": "2026-10-15",
@@ -22,7 +22,7 @@
     {
       "name": "What's driving the 10Y?",
       "status": "good",
-      "label": "Easing"
+      "label": "Growth-led"
     },
     {
       "name": "Curve shape (10Y − 2Y)",
