@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-28",
+  "updated": "2026-10-29",
   "yields_date": "2026-10-28",
   "y2": 4.67,
   "y10": 5.05,
@@ -8,16 +8,16 @@
   "real": 2.67,
   "be": 2.38,
   "split_date": "2026-10-28",
-  "hy": 3.18,
-  "hy_date": "2026-10-27",
+  "hy": 3.14,
+  "hy_date": "2026-10-28",
   "gap": 0.3,
   "fed": {
     "lo": 3.75,
     "hi": 4.0,
-    "date": "2026-10-27"
+    "date": "2026-10-28"
   },
-  "mort": 7.32,
-  "mort_date": "2026-10-22",
+  "mort": 7.24,
+  "mort_date": "2026-10-29",
   "tiles": [
     {
       "name": "What's driving the 10Y?",
@@ -36,8 +36,8 @@
     },
     {
       "name": "Auction demand",
-      "status": "warn",
-      "label": "Soft"
+      "status": "good",
+      "label": "Solid"
     },
     {
       "name": "Equity yield gap",
