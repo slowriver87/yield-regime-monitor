@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-10",
+  "updated": "2026-11-12",
   "yields_date": "2026-11-10",
   "y2": 4.73,
   "y10": 4.98,
@@ -14,10 +14,10 @@
   "fed": {
     "lo": 3.75,
     "hi": 4.0,
-    "date": "2026-11-09"
+    "date": "2026-11-10"
   },
-  "mort": 7.18,
-  "mort_date": "2026-11-05",
+  "mort": 7.11,
+  "mort_date": "2026-11-12",
   "tiles": [
     {
       "name": "What's driving the 10Y?",
@@ -36,8 +36,8 @@
     },
     {
       "name": "Auction demand",
-      "status": "good",
-      "label": "Solid"
+      "status": "warn",
+      "label": "Soft"
     },
     {
       "name": "Equity yield gap",
