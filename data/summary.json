@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-12",
+  "updated": "2026-11-13",
   "yields_date": "2026-11-12",
   "y2": 4.86,
   "y10": 5.1,
@@ -8,13 +8,13 @@
   "real": 2.86,
   "be": 2.24,
   "split_date": "2026-11-12",
-  "hy": 3.34,
-  "hy_date": "2026-11-09",
-  "gap": 0.55,
+  "hy": 3.2,
+  "hy_date": "2026-11-12",
+  "gap": 0.36,
   "fed": {
     "lo": 3.75,
     "hi": 4.0,
-    "date": "2026-11-10"
+    "date": "2026-11-12"
   },
   "mort": 7.11,
   "mort_date": "2026-11-12",
@@ -41,8 +41,8 @@
     },
     {
       "name": "Equity yield gap",
-      "status": "warn",
-      "label": "Thin"
+      "status": "crit",
+      "label": "No cushion"
     }
   ]
 }
