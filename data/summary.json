@@ -1,5 +1,5 @@
 {
-  "updated": "2026-11-19",
+  "updated": "2026-11-20",
   "yields_date": "2026-11-19",
   "y2": 4.76,
   "y10": 5.04,
@@ -8,13 +8,13 @@
   "real": 2.88,
   "be": 2.16,
   "split_date": "2026-11-19",
-  "hy": 3.47,
-  "hy_date": "2026-11-18",
-  "gap": 0.42,
+  "hy": 3.52,
+  "hy_date": "2026-11-19",
+  "gap": 0.81,
   "fed": {
     "lo": 3.75,
     "hi": 4.0,
-    "date": "2026-11-18"
+    "date": "2026-11-19"
   },
   "mort": 7.28,
   "mort_date": "2026-11-19",
@@ -31,8 +31,8 @@
     },
     {
       "name": "High-yield credit spread",
-      "status": "warn",
-      "label": "Watch"
+      "status": "serious",
+      "label": "Stress"
     },
     {
       "name": "Auction demand",
@@ -41,8 +41,8 @@
     },
     {
       "name": "Equity yield gap",
-      "status": "crit",
-      "label": "No cushion"
+      "status": "warn",
+      "label": "Thin"
     }
   ]
 }
