@@ -1,20 +1,20 @@
 {
   "updated": "2026-11-24",
-  "yields_date": "2026-11-23",
+  "yields_date": "2026-11-24",
   "y2": 4.63,
-  "y10": 4.92,
-  "y30": 5.29,
-  "curve": 0.29,
+  "y10": 4.91,
+  "y30": 5.3,
+  "curve": 0.28,
   "real": 2.79,
-  "be": 2.13,
-  "split_date": "2026-11-23",
-  "hy": 3.76,
-  "hy_date": "2026-11-20",
-  "gap": 0.93,
+  "be": 2.12,
+  "split_date": "2026-11-24",
+  "hy": 3.63,
+  "hy_date": "2026-11-23",
+  "gap": 0.94,
   "fed": {
     "lo": 3.75,
     "hi": 4.0,
-    "date": "2026-11-20"
+    "date": "2026-11-23"
   },
   "mort": 7.28,
   "mort_date": "2026-11-19",
@@ -36,8 +36,8 @@
     },
     {
       "name": "Auction demand",
-      "status": "good",
-      "label": "Solid"
+      "status": "warn",
+      "label": "Soft"
     },
     {
       "name": "Equity yield gap",
